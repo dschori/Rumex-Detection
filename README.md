@@ -1,2 +1,2 @@
 # Agroscope
-Repo for Rumex Analysis
+Repo for Rumex Optusifolius detection in field-images
