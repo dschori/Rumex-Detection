@@ -10,7 +10,8 @@
 # Folders #
 ############
 tensorboard/
-9999_Data/
+.ipynb_checkpoints/
+data/
 _Git_Config/
 _old/
 
