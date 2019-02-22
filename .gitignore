@@ -12,6 +12,7 @@
 tensorboard/
 .ipynb_checkpoints/
 data/
+saved_models/
 _Git_Config/
 _old/
 
