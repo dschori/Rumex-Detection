@@ -29,7 +29,7 @@ class Visualize():
         self.mode = mode
         _, ax = plt.subplots(1,1,figsize=self.figsize)
         self.__add_image(index,ax)
-        return self.prediction
+        return self.img, self.prediction
 
     def show_matrix(self,index,mode,rows=4):
         self.mode = mode
