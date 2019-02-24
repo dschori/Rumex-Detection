@@ -118,7 +118,6 @@ class Visualize():
         return directory
         
     def __load_data(self):
-        img_path = self.directory + 'Images/Placken/' + str(self.index)
         self.indices = [i for i, s in enumerate(self.file_list) if str(self.index) in s]
         
         if len(self.indices) == 0 or len(self.indices) > 1:
