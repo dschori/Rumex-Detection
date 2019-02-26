@@ -132,6 +132,7 @@ class Visualize():
         self.msk = None
         self.prediction = None
         self.indices = None
+        self.dice_score = None
         self.directory = self.__get_directory()
         self.file_list = os.listdir(self.directory+'images')
             
@@ -201,13 +202,10 @@ class Visualize():
             else:
                 ax.imshow(self.prediction>self.prediction_threshold, alpha=0.4)
             ax.imshow(error,cmap='Reds', alpha=0.3)
-            overlap = np.invert(error)
-            dice = ((overlap.sum()/(error.shape[0]*error.shape[1])))
-            dice = overlap.sum()/(self.msk.sum())
-            if dice > 1:
-                dice = 1/dice
-        ax.set_title('Image Nr: ' + str(self.file_list[self.indices[0]]))
-
+        if self.dice_score == None:
+            self.dice_score = 0.0
+        ax.set_title('Image Nr: ' + str(self.file_list[self.indices[0]]) + "  Dice Coeff: " + str(round(self.dice_score,2)), fontsize=15)
+        self.dice_score = None
                          
     def __make_image_row(self,index,ax):
         self.__add_image(index[0],ax[0])
@@ -242,3 +240,8 @@ class Visualize():
         tmp_img = self.img.reshape(1,*SHAPE,3)
         self.prediction = self.model.predict(tmp_img)
         self.prediction = self.prediction.reshape(*SHAPE)
+        smooth = 1.0
+        y_true_f = np.ndarray.flatten(self.msk.astype(float))
+        y_pred_f = np.ndarray.flatten(self.prediction.astype(float))
+        intersection = np.sum(y_true_f * y_pred_f)
+        self.dice_score = (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
