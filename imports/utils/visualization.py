@@ -131,10 +131,18 @@ class Visualize():
         self.img = None
         self.msk = None
         self.prediction = None
+        self.error = None
         self.indices = None
         self.dice_score = None
         self.directory = self.__get_directory()
         self.file_list = os.listdir(self.directory+'images')
+
+    def calculate_error_mask(self,index,threshold=0.95):
+        self.index = index
+        self.__load_data()
+        self.__predict()
+        self.error = np.equal(self.prediction>threshold,self.msk<1)
+        return self.error
             
     def show_single(self,index,mode):
         self.mode = mode
@@ -162,7 +170,8 @@ class Visualize():
         
         for i in log_progress(range(len(ax)),every=1,name='Rows'):
             ind = index[2*i:2*i+2]
-            self.__make_image_row(ind,ax[i])  
+            self.__make_image_row(ind,ax[i]) 
+        plt.subplots_adjust(wspace=0.01, hspace=0)
             
     def __add_image(self,index,ax=None):
         '''
@@ -195,16 +204,17 @@ class Visualize():
                 ax.imshow(self.prediction>self.prediction_threshold, alpha=0.4)
         if self.mode == "image_prediction_error":
             self.__predict()
-            error = np.equal(self.prediction>0.95,self.msk<1)
+            self.error = np.equal(self.prediction>0.95,self.msk<1)
             ax.imshow(self.img)
             if self.prediction_threshold == None:
                 ax.imshow(self.prediction, alpha=0.4)
             else:
                 ax.imshow(self.prediction>self.prediction_threshold, alpha=0.4)
-            ax.imshow(error,cmap='Reds', alpha=0.3)
+            ax.imshow(self.error,cmap='Reds', alpha=0.3)
         if self.dice_score == None:
             self.dice_score = 0.0
         ax.set_title('Image Nr: ' + str(self.file_list[self.indices[0]]) + "  Dice Coeff: " + str(round(self.dice_score,2)), fontsize=15)
+        ax.axis('off')
         self.dice_score = None
                          
     def __make_image_row(self,index,ax):
