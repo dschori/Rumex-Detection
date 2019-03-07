@@ -28,6 +28,9 @@ class Visualize():
         self.directory = self.__get_directory()
         self.file_list = os.listdir(self.directory+'images')
 
+    def get_data_set(self):
+        return self.data_set
+
     def get_image(self,index):
         if index == 'random':
             raise ValueError('Random not supported here!')
