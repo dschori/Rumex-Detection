@@ -91,10 +91,14 @@ class Visualize():
             index = []
             n = rows*2
             for i in range(n):
-                tmp_index = np.random.random_integers(0,len(self.df))
+                tmp_index = np.random.random_integers(0,len(self.df)) + 1000
                 index.append(tmp_index)
         else:
             n = len(index)
+            if n <= 2:
+                raise ValueError('Index length must be greater then 2')
+            if n % 2 != 0:
+                raise ValueError('Index length must be eval')
         #Add None if odd:
         if n%2 != 0:
             index.append(None)
@@ -116,10 +120,10 @@ class Visualize():
         '''
         
         if index == 'random':
-            self.index = np.random.random_integers(0,len(self.df))
+            self.index = np.random.random_integers(0,len(self.df))+1000
         else:
             self.index = index
-            
+            #self.index = self.df[self.df['name'].str.contains(str(index))].index.values[0]
         self.__load_data()
         
         if ax == None:
@@ -158,7 +162,7 @@ class Visualize():
             raise ValueError('Image not found')
         elif len(self.df_row_at_index) > 1:
             raise ValueError('Index not unique')
-        
+        #print(self.df_row_at_index.image_path.values[0]+self.df_row_at_index.name.values[0])
         img= imread(self.df_row_at_index.image_path.values[0]+self.df_row_at_index.name.values[0])
         msk = imread(self.df_row_at_index.mask_path.values[0]+self.df_row_at_index.name.values[0])
         
