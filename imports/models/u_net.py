@@ -1,6 +1,6 @@
 from keras.models import Model
 from keras.layers import Input, concatenate, Conv2D, MaxPooling2D, Activation, UpSampling2D, BatchNormalization
-from keras.optimizers import RMSprop
+from keras.optimizers import RMSprop, Adadelta
 
 from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff
 
@@ -176,7 +176,8 @@ def get_unet(input_shape=(1024, 1024, 3),
 
     model = Model(inputs=inputs, outputs=classify)
 
-    model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff])
+    #model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff])
+    model.compile(optimizer=Adadelta(lr=1.0, rho=0.95, epsilon=None, decay=0.0), loss=bce_dice_loss, metrics=[dice_coeff])
 
     return model
 	
