@@ -13,22 +13,17 @@ from imports.utils.log_progress import log_progress
 # https://stackoverflow.com/questions/9056957/correct-way-to-define-class-variables-in-python
 
 class Visualize():
-    def __init__(self,df,data_set,model):
+    def __init__(self,df,model):
         self.df = df
-        self.data_set = data_set
         self.model = model
         self.figsize = (10,10)
         self.prediction_threshold = 0.95
-        self.index = None
-        self.df_row_at_index = None
+        self.selected_row = None
         self.mode = None
         self.img = None
         self.msk = None
         self.prediction = None
         self.dice_score = None
-
-    def get_data_set(self):
-        return self.data_set
 
     def get_image(self,index):
         if index == 'random':
@@ -86,22 +81,19 @@ class Visualize():
 
     def show_matrix(self,index,mode,rows=4):
         self.mode = mode
-        
+        selected_rows = None
+        ## TODO make compatible with dataframe:
         if index == 'random':
-            index = []
             n = rows*2
-            for i in range(n):
-                tmp_index = np.random.random_integers(0,len(self.df)) + 1000
-                index.append(tmp_index)
+            selected_rows = self.df.sample(n)
         else:
             n = len(index)
+            for r in index:
+
             if n <= 2:
                 raise ValueError('Index length must be greater then 2')
             if n % 2 != 0:
                 raise ValueError('Index length must be eval')
-        #Add None if odd:
-        if n%2 != 0:
-            index.append(None)
                          
         _, ax = plt.subplots(int(n/2),2,figsize=(15,3*n))
         
@@ -118,12 +110,10 @@ class Visualize():
         '''
         Adds image to 'ax' Object
         '''
-        
         if index == 'random':
-            self.index = np.random.random_integers(0,len(self.df))+1000
+            self.selected_row = self.df.sample(1)
         else:
-            self.index = index
-            #self.index = self.df[self.df['name'].str.contains(str(index))].index.values[0]
+            self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.__load_data()
         
         if ax == None:
@@ -150,28 +140,21 @@ class Visualize():
             ax.imshow(self.error,cmap='Reds', alpha=0.4, interpolation='none')
         if self.dice_score == None:
             self.dice_score = 0.0
-        ax.set_title('Image: ' + str(self.df_row_at_index.name.values[0]) + "  Dice Coeff: " + str(round(self.dice_score,2)), fontsize=15)
+        ax.set_title('Image: ' + str(self.selected_row.name.values[0]) + "  Dice Coeff: " + str(round(self.dice_score,2)), fontsize=15)
         ax.axis('off')
         self.dice_score = None
         
     def __load_data(self):
+        if len(self.selected_row) == 0:
+            raise ValueError('Image not found, index not in dataframe')
 
-        self.df_row_at_index = self.df[self.df['name'].str.contains(str(self.index))]
-        
-        if len(self.df_row_at_index) == 0:
-            raise ValueError('Image not found')
-        elif len(self.df_row_at_index) > 1:
-            raise ValueError('Index not unique')
-        #print(self.df_row_at_index.image_path.values[0]+self.df_row_at_index.name.values[0])
-        img= imread(self.df_row_at_index.image_path.values[0]+self.df_row_at_index.name.values[0])
-        msk = imread(self.df_row_at_index.mask_path.values[0]+self.df_row_at_index.name.values[0])
+        img= imread(self.selected_row.image_path.values[0]+self.selected_row.name.values[0])
+        msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
         
         self.img = resize(img,(SHAPE[0],SHAPE[1])).reshape(*SHAPE,3)
         self.img = img_as_float(self.img)
         self.msk = resize(msk,(SHAPE[0],SHAPE[1])).reshape(*SHAPE)
         self.msk = img_as_float(self.msk)
-
-        self.index_loaded = self.index
         
     def __predict(self):
         tmp_img = self.img.reshape(1,*SHAPE,3)
@@ -192,9 +175,17 @@ class Evaluate(Visualize):
     Evaluate specific Model
     Target: tbd
     '''
-    def __init__(self,df,model):
-        self.df = df
+    def __init__(self):
+        Visualize.__init__(self,df,data_set,model)
         self.img = None
+
+    def get_dice_coeff(self):
+        dice_coeffs = []
+        for index, row in self.df.iterrows():
+            self.__load_data()
+            self.__predict()
+            print(self.prediction.shape)
+            
 
     def __find_roots(self):
         pass
