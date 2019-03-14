@@ -1,5 +1,36 @@
 from keras.losses import binary_crossentropy
 import keras.backend as K
+from matplotlib.pyplot import imsave
+from skimage.measure import label
+from scipy.ndimage.morphology import distance_transform_edt
+import numpy as np
+
+
+def weight_map(y_true,wc=None,w0=1,sigma=12):
+    y = y_true.astype(bool)
+    labels = label(y)
+    no_labels = labels == 0
+    label_ids = sorted(np.unique(labels))[1:]
+
+    if len(label_ids) > 1:
+        distances = np.zeros((y.shape[0], y.shape[1], len(label_ids)))
+
+        for i, label_id in enumerate(label_ids):
+            distances[:,:,i] = distance_transform_edt(labels != label_id)
+            
+        distances = np.sort(distances, axis=2)
+        d1 = distances[:,:,0]
+        d2 = distances[:,:,1]
+        w = w0 * np.exp(-1/2*((d1 + d2) / sigma)**2) * no_labels
+
+        if wc:
+            class_weights = np.zeros_like(y)
+            for k, v in wc.items():
+                class_weights[y == k] = v
+            w = w + class_weights
+    else:
+        w = np.zeros_like(y)
+    return w
 
 
 def dice_coeff(y_true, y_pred):
@@ -8,7 +39,7 @@ def dice_coeff(y_true, y_pred):
     y_pred_f = K.flatten(y_pred)
     intersection = K.sum(y_true_f * y_pred_f)
     score = (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
-    return score
+    return score #Scalar
 
 
 def dice_loss(y_true, y_pred):
@@ -16,9 +47,18 @@ def dice_loss(y_true, y_pred):
     return loss
 
 
+def bce_dice_weighted_loss(y_true,y_pred):
+     # TODO: Add weight map to binary_crossentropy
+     #This wont work: 
+    loss = bce_dice_loss(y_true,y_pred) * weight_map(y_true)
+    # TODO: Test this:
+    print(loss.shape)
+    imsave("weighted_loss_test.png",loss)
+    return loss
+
 def bce_dice_loss(y_true, y_pred):
     loss = binary_crossentropy(y_true, y_pred) + dice_loss(y_true, y_pred)
-    return loss
+    return loss #Scalar
 
 
 def weighted_dice_coeff(y_true, y_pred, weight):
