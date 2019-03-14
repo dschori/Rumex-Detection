@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.pyplot import figure, imread, imsave, imshow
 from skimage.transform import rescale, resize
+from skimage.color import rgb2gray
 from skimage import img_as_float
 import pandas as pd
 
@@ -144,6 +145,10 @@ class Visualize():
             ax.imshow(self.img, interpolation='none')
             ax.imshow(self.prediction, interpolation='none',alpha=0.2)
             ax.imshow(self.error,cmap='Reds', alpha=0.4, interpolation='none')
+        if self.mode == 'normalized_gray':
+            norm = rgb2gray(self.img)
+            norm = (norm-np.mean(norm))/np.std(norm)
+            ax.imshow(norm,cmap="gray") 
         if self.dice_score == None:
             self.dice_score = 0.0
         ax.set_title('Image: ' + str(self.selected_row.name.values[0]) + "  Dice Coeff: " + str(round(self.dice_score,2)), fontsize=15)
@@ -209,10 +214,4 @@ class Evaluate(Visualize):
         pass
 
     def __eval_circle_model(self):
-        for _, row in self.df.iterrows():
-            self.img = imread(row['image_path']+row['name'])
-            self.predict()
-            self.__find_roots()
-            roots = row['roots']
-            for root in roots:
-                pass
+        pass
