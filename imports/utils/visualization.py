@@ -9,6 +9,7 @@ from skimage.transform import rescale, resize
 from skimage.color import rgb2gray
 from skimage import img_as_float
 import pandas as pd
+from skimage import exposure
 
 from imports.utils.enums import DATA_BASE_PATH, SHAPE
 from imports.utils.log_progress import log_progress
@@ -16,9 +17,10 @@ from imports.utils.log_progress import log_progress
 # https://stackoverflow.com/questions/9056957/correct-way-to-define-class-variables-in-python
 
 class Visualize():
-    def __init__(self,df,model,masktype='hand'):
+    def __init__(self,df,model,input_shape=(512,768,3),masktype='hand'):
         self.df = df
         self.model = model
+        self.input_shape = input_shape
         self.figsize = (10,10)
         self.prediction_threshold = 0.95
         self.selected_row = None
@@ -27,6 +29,8 @@ class Visualize():
         self.msk = None
         self.prediction = None
         self.dice_score = None
+        self.img_shape = None
+        self.model_shape = None
         assert masktype=='auto' or masktype=='hand', 'Masktype not allowed'
         self.masktype = masktype
 
@@ -122,7 +126,6 @@ class Visualize():
         '''
         self.selected_row = row
         self.load_data()
-        
         if ax == None:
             _, ax = plt.subplots(figsize=self.figsize)
         if self.mode == "image":
@@ -134,7 +137,7 @@ class Visualize():
             ax.imshow(self.msk,cmap="terrain",alpha=0.4)
         if self.mode == "image_prediction":
             self.predict()
-            ax.imshow(self.img)
+            ax.imshow(self.img,cmap='gray')
             if self.prediction_threshold == None:
                 ax.imshow(self.prediction, alpha=0.4)
             else:
@@ -158,31 +161,47 @@ class Visualize():
     def load_data(self):
         if len(self.selected_row) == 0:
             raise ValueError('Image not found, index not in dataframe')
-
         img= imread(self.selected_row.image_path.values[0]+self.selected_row.name.values[0])
         if self.masktype == 'hand':
             msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
         elif self.masktype == 'auto':
             msk = imread(self.selected_row.mask_cirlce_path.values[0]+self.selected_row.name.values[0])[:,:,0]
-        
-        self.img = resize(img,(SHAPE[0],SHAPE[1])).reshape(*SHAPE,3)
+
+        img = self.__adjust_data(img)
+
+        if self.input_shape[2] == 1: #grayscale
+            self.img = resize(img,self.input_shape[:2]).reshape(*self.input_shape[:2])
+        if self.input_shape[2] == 3: #rgb
+            self.img = resize(img,self.input_shape[:2]).reshape(*self.input_shape)
         self.img = img_as_float(self.img)
-        self.msk = resize(msk,(SHAPE[0],SHAPE[1])).reshape(*SHAPE)
+        self.msk = resize(msk,self.input_shape[:2]).reshape(*self.input_shape[:2])
         self.msk = img_as_float(self.msk)
         
     def predict(self):
-        tmp_img = self.img.reshape(1,*SHAPE,3)
+        if self.model.layers[0].input_shape[1:] != self.input_shape:
+            raise ValueError('Modelinput and Image Shape doesnt match \n ' + 'Modelinput Shape is: ' + str(self.model.layers[0].input_shape[1:]) + '\n' + 'Defined Input Shape is: ' + str(self.input_shape))
+
+        tmp_img = self.img.reshape(1,*self.input_shape)
         self.prediction = self.model.predict(tmp_img)
-        self.prediction = self.prediction.reshape(*SHAPE)
+        self.prediction = self.prediction.reshape(*self.input_shape[:2])
         if self.prediction_threshold == None:
             self.prediction = img_as_float(self.prediction)
         else:
             self.prediction = img_as_float(self.prediction>self.prediction_threshold)
-        smooth = 1.0
+
+        smooth = 0.0
         y_true_f = np.ndarray.flatten(self.msk.astype(float))
         y_pred_f = np.ndarray.flatten(self.prediction.astype(float))
         intersection = np.sum(y_true_f * y_pred_f)
         self.dice_score = (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+
+    def __adjust_data(self,img):
+        if self.input_shape[2] == 1: #grayscale
+            img = rgb2gray(img)
+            img = exposure.equalize_hist(img)
+        elif self.input_shape[2] == 3: #rgb
+            pass #TODO
+        return img
 
 class Evaluate(Visualize):
     '''
