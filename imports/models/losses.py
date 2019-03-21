@@ -33,6 +33,15 @@ def weight_map(y_true,wc=None,w0=1,sigma=12):
     return w
 
 
+def iou(y_true,y_pred,smooth=1):
+    intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
+    union = (K.sum(y_true,-1) + K.sum(y_pred,-1)) - intersection
+    iou = (intersection + smooth) / ( union + smooth)
+    return iou
+
+def iou_loss(y_true,y_pred):
+    return -iou(y_true,y_pred)
+
 def dice_coeff(y_true, y_pred):
     smooth = 1.
     y_true_f = K.flatten(y_true)
@@ -41,11 +50,13 @@ def dice_coeff(y_true, y_pred):
     score = (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
     return score #Scalar
 
+def bce_loss(y_true,y_pred):
+    # From: https://github.com/keras-team/keras/blob/master/keras/losses.py
+    return K.mean(K.binary_crossentropy(y_true, y_pred), axis=-1)
 
 def dice_loss(y_true, y_pred):
     loss = 1 - dice_coeff(y_true, y_pred)
     return loss
-
 
 def bce_dice_weighted_loss(y_true,y_pred):
      # TODO: Add weight map to binary_crossentropy
