@@ -55,33 +55,6 @@ class Visualize():
         self.load_data()
         self.predict()
         return self.prediction
-
-    def get_false_negative_mask(self,index):
-        if index == 'random':
-            raise ValueError('Random not supported here!')
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        self.load_data()
-        self.predict()
-        false_negative_error = (self.prediction-self.msk)>0
-        return img_as_float(false_negative_error)
-
-    def get_false_positive_mask(self,index):
-        if index == 'random':
-            raise ValueError('Random not supported here!')
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        self.load_data()
-        self.predict()
-        false_positive_error = (self.prediction-self.msk)<0
-        return img_as_float(false_positive_error)
-
-    def get_full_error_mask(self,index):
-        if index == 'random':
-            raise ValueError('Random not supported here!')
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        self.load_data()
-        self.predict()
-        error = np.abs((self.prediction-self.msk))
-        return error
             
     def show_single(self,index,mode):
         self.mode = mode
@@ -183,7 +156,7 @@ class Visualize():
 
         tmp_img = self.img.reshape(1,*self.input_shape)
         self.prediction = self.model.predict(tmp_img)
-        self.prediction = self.prediction.reshape(*self.input_shape[:2])
+        self.prediction = self.prediction[:,:,:,0].reshape(*self.input_shape[:2])
         if self.prediction_threshold == None:
             self.prediction = img_as_float(self.prediction)
         else:
@@ -208,8 +181,13 @@ class Evaluate(Visualize):
     Evaluate specific Model
     Target: tbd
     '''
-    def __init__(self,df,model,masktype='hand'):
-        Visualize.__init__(self,df,model,masktype='hand')
+    def __init__(self,df,input_shape,model,masktype='hand'):
+        #Visualize.__init__(self,df,model,masktype='hand')
+        self.df = df
+        self.input_shape = input_shape
+        self.model = model
+        self.masktype = masktype
+        self.prediction_threshold = None
 
     def get_dice_coeff(self,mode='simple'):
         assert mode=='simple' or mode=='raw', 'Mode must be "simple" or "raw"'
@@ -228,6 +206,34 @@ class Evaluate(Visualize):
             return min(dice_coeffs), max(dice_coeffs), sum(dice_coeffs)/len(dice_coeffs)
         elif mode == 'raw':
             return dice_coeffs
+
+
+    def get_false_negative_mask(self,index):
+        if index == 'random':
+            raise ValueError('Random not supported here!')
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        self.load_data()
+        self.predict()
+        false_negative_error = (self.prediction-self.msk)>0
+        return img_as_float(false_negative_error)
+
+    def get_false_positive_mask(self,index):
+        if index == 'random':
+            raise ValueError('Random not supported here!')
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        self.load_data()
+        self.predict()
+        false_positive_error = (self.prediction-self.msk)<0
+        return img_as_float(false_positive_error)
+
+    def get_full_error_mask(self,index):
+        if index == 'random':
+            raise ValueError('Random not supported here!')
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        self.load_data()
+        self.predict()
+        error = np.abs((self.prediction-self.msk))
+        return error
             
     def __find_roots(self):
         pass
