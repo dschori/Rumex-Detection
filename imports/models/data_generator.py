@@ -1,10 +1,12 @@
 import skimage
 from skimage import exposure
 from skimage.color import rgb2gray
+from skimage.draw import circle
 from matplotlib.pyplot import imshow, imread, imsave
 import keras
 import numpy as np 
 import pandas as pd
+from scipy import ndimage as ndi
 
 from imports.utils.enums import DATA_BASE_PATH, SHAPE
 
@@ -62,23 +64,25 @@ class DataGenerator(keras.utils.Sequence):
         'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
         # Initialization
         imgs = np.empty((self.batch_size, *self.target_size, self.input_channels))
-        masks = np.empty((self.batch_size, *self.target_size, 1))
+        masks = np.empty((self.batch_size, *self.target_size, 2))
         # Generate data
         ind = 0
         for _, row in tmp_df.iterrows():
             img = imread(row['image_path']+row['name'])
             msk = imread(row['mask_path']+row['name'])
-            img = rgb2gray(img)
-            msk = rgb2gray(msk)
-            #print("Unique Values: " + str(np.unique(msk)))
+            msk_circle = imread(row['mask_cirlce_path']+row['name'])
+            
+            if self.input_channels == 1:
+                img = rgb2gray(img)
             # Adjust Data
-            img, msk = self.__adjust_data(img, msk)
-            #print("Unique Values: " + str(np.unique(msk)))
-            imgs[ind,] = resize(img,(self.target_size[0],self.target_size[1])).reshape(*self.target_size,self.input_channels)
-            masks[ind,] = resize(msk,(self.target_size[0],self.target_size[1])).reshape(*self.target_size,1)
+            img, msk, msk_circle = self.__adjust_data(img, msk, msk_circle)
+            #print(msk_circle.shape)
+            imgs[ind,] = resize(img,self.target_size).reshape(*self.target_size,self.input_channels)
+            masks[ind,:,:,0] = resize(msk,self.target_size).reshape(*self.target_size)
+            masks[ind,:,:,1] = resize(msk_circle,self.target_size).reshape(*self.target_size)
             ind += 1
 
-        return imgs, masks
+        return imgs, [masks[:,:,:,0].reshape(4,512,768,1), masks[:,:,:,1].reshape(4,512,768,1)]
 
     def __augmented_data_generation(self,tmp_df):
         for _, row in tmp_df.iterrows():
@@ -132,16 +136,22 @@ class DataGenerator(keras.utils.Sequence):
 
         return imgs, masks
     
-    def __adjust_data(self,img,mask):
+    def __adjust_data(self,img,mask, msk_circle):
         # Apply HistogramEqualization:
         img = exposure.equalize_hist(img)
+        if len(mask.shape) == 3:
+            mask = rgb2gray(mask)
+        if len(msk_circle.shape) == 3:
+            msk_circle = rgb2gray(msk_circle)
         if img.max() > 1.0:
             img = img / 255
         if mask.max() > 1.0:
             mask = mask / 255
+        if msk_circle.max() > 1.0:
+            msk_circle = msk_circle / 255
         mask[mask > 0.5] = 1
         mask[mask <= 0.5] = 0
-        return (img,mask)
+        return (img,mask,msk_circle)
         
     def __save_data(self,img,mask):
         self.save_index += 1

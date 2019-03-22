@@ -17,9 +17,10 @@ from imports.utils.log_progress import log_progress
 # https://stackoverflow.com/questions/9056957/correct-way-to-define-class-variables-in-python
 
 class Visualize():
-    def __init__(self,df,model,input_shape=(512,768,3),masktype='hand'):
+    def __init__(self,df,pred_layer,model,input_shape=(512,768,3),masktype='hand'):
         self.df = df
         self.model = model
+        self.pred_layer = pred_layer
         self.input_shape = input_shape
         self.figsize = (10,10)
         self.prediction_threshold = 0.95
@@ -156,7 +157,7 @@ class Visualize():
 
         tmp_img = self.img.reshape(1,*self.input_shape)
         self.prediction = self.model.predict(tmp_img)
-        self.prediction = self.prediction[:,:,:,0].reshape(*self.input_shape[:2])
+        self.prediction = self.prediction[:,:,:,self.pred_layer].reshape(*self.input_shape[:2])
         if self.prediction_threshold == None:
             self.prediction = img_as_float(self.prediction)
         else:

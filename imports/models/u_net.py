@@ -2,7 +2,7 @@ from keras.models import Model
 from keras.layers import Input, concatenate, MaxPooling2D,Conv2D, Activation, UpSampling2D, BatchNormalization
 from keras.optimizers import RMSprop, Adadelta
 
-from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff, iou
+from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff, iou, iou_loss
 
 
 ## Simple UNet:
@@ -172,11 +172,29 @@ def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
     up0b = Activation('relu')(up0b)
     # 1024
 
-    classify = Conv2D(num_classes, (1, 1), activation='sigmoid')(up0b)
+    classify = Conv2D(1, (1, 1), activation='sigmoid',name="seg1")(up0b)
+    classify2 = Conv2D(1, (1, 1), activation='sigmoid',name="seg2")(up0b)
 
-    model = Model(inputs=inputs, outputs=classify)
+    #model = Model(inputs=inputs, outputs=classify)
 
-    model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+    #model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+
+    model = Model(
+			inputs=inputs,
+			outputs=[classify, classify2],)
+
+    opt = RMSprop(lr=0.0001)
+    losses = {
+	"seg1": bce_dice_loss,
+	"seg2": iou_loss
+    }   
+    lossWeights = {"seg1": 2.0, "seg2": 1.0}
+    metrics = {
+        "seg1" : dice_coeff,
+        "seg2" : iou
+    }
+
+    model.compile(optimizer=opt, loss=losses, loss_weights=lossWeights, metrics=metrics)
 
     return model
 	
