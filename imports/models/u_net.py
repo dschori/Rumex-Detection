@@ -7,6 +7,9 @@ from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_lo
 
 ## Simple UNet:
 def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
+
+    assert num_classes == 1 or num_classes == 2 , "Number of output_classes not Supportet"
+
     inputs = Input(shape=input_shape)
     # 1024
 
@@ -172,30 +175,24 @@ def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
     up0b = Activation('relu')(up0b)
     # 1024
 
-    classify = Conv2D(1, (1, 1), activation='sigmoid',name="seg1")(up0b)
-    classify2 = Conv2D(1, (1, 1), activation='sigmoid',name="seg2")(up0b)
-
-    #model = Model(inputs=inputs, outputs=classify)
-
-    #model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
-
-    model = Model(
-			inputs=inputs,
-			outputs=[classify, classify2],)
-
-    opt = RMSprop(lr=0.0001)
-    losses = {
-	"seg1": bce_dice_loss,
-	"seg2": iou_loss
-    }   
-    lossWeights = {"seg1": 2.0, "seg2": 1.0}
-    metrics = {
-        "seg1" : dice_coeff,
-        "seg2" : iou
-    }
-
-    model.compile(optimizer=opt, loss=losses, loss_weights=lossWeights, metrics=metrics)
-
-    return model
+    if num_classes == 1:
+        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(up0b)
+        model = Model(inputs=inputs, outputs=map1)
+        model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+        return model
+    elif num_classes == 2:
+        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(up0b)
+        map2 = Conv2D(1, (1, 1), activation='sigmoid',name="map2")(up0b)
+        model = Model(inputs=inputs, outputs=[map1, map2],)
+        losses = {
+        "map1": bce_dice_loss,
+        "map2": "binary_crossentropy"}   
+        lossWeights = {"map1": 2.0, "map2": 1.0}
+        metrics = {
+            "map1" : dice_coeff,
+            "map2" : iou,
+            "bce" : "binary_crossentropy"}
+        model.compile(optimizer=RMSprop(lr=0.0001), loss=losses, loss_weights=lossWeights, metrics=metrics)
+        return model
 	
 ### TODO: Implement Unet as proposed in: https://arxiv.org/abs/1505.04597

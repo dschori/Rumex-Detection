@@ -82,7 +82,7 @@ class DataGenerator(keras.utils.Sequence):
             masks[ind,:,:,1] = resize(msk_circle,self.target_size).reshape(*self.target_size)
             ind += 1
 
-        return imgs, [masks[:,:,:,0].reshape(4,512,768,1), masks[:,:,:,1].reshape(4,512,768,1)]
+        return imgs, [masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1), masks[:,:,:,1].reshape(self.batch_size,*self.target_size,1)]
 
     def __augmented_data_generation(self,tmp_df):
         for _, row in tmp_df.iterrows():
