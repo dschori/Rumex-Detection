@@ -14,3 +14,4 @@ Required Packages:
 - pil
 - sklearn
 - matplotlib
+- cv2
