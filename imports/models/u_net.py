@@ -196,3 +196,74 @@ def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
         return model
 	
 ### TODO: Implement Unet as proposed in: https://arxiv.org/abs/1505.04597
+
+def down_block(input,n_feature_maps):
+    down = Conv2D(n_feature_maps, (3, 3), padding='same')(input)
+    down = BatchNormalization()(down)
+    down = Activation('relu')(down)
+    down = Conv2D(n_feature_maps, (3, 3), padding='same')(down)
+    down = BatchNormalization()(down)
+    down = Activation('relu')(down)
+    concat_layer = down
+    down = MaxPooling2D((2, 2), strides=(2, 2))(down)
+    return down, concat_layer
+
+def up_block(input,concat_layer,n_feature_maps):
+    up = UpSampling2D((2, 2))(input)
+    up = concatenate([concat_layer, up], axis=3)
+    up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
+    up = BatchNormalization()(up)
+    up = Activation('relu')(up)
+    up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
+    up = BatchNormalization()(up)
+    up = Activation('relu')(up)
+    up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
+    up = BatchNormalization()(up)
+    up = Activation('relu')(up)
+    return up
+
+def get_unet_mod(input_shape=(1024, 1024, 3),num_classes=1):
+    concats_list = []
+    feature_maps = [8,16,32,64,128,256,512] #without center
+    input = Input(shape=input_shape)
+    origin = input
+    
+    # downsampling:
+    for d in range(len(feature_maps)):
+        output, concat_layer = down_block(input,feature_maps[d])
+        input = output
+        concats_list.append(concat_layer)
+
+    # center
+    center = Conv2D(feature_maps[-1]*2, (3, 3), padding='same')(output)
+    center = BatchNormalization()(center)
+    center = Activation('relu')(center)
+    center = Conv2D(feature_maps[-1]*2, (3, 3), padding='same')(center)
+    center = BatchNormalization()(center)
+    center = Activation('relu')(center)
+    input = center
+    print(concats_list[0])
+    # upsampling:
+    for u in range(len(feature_maps)):
+        ouput = up_block(input,concats_list[::-1][u],feature_maps[::-1][u])
+        input = output
+
+    if num_classes == 1:
+        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(output)
+        model = Model(inputs=origin, outputs=map1)
+        model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+        return model
+    elif num_classes == 2:
+        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(output)
+        map2 = Conv2D(1, (1, 1), activation='sigmoid',name="map2")(output)
+        model = Model(inputs=origin, outputs=[map1, map2],)
+        losses = {
+        "map1": bce_dice_loss,
+        "map2": "binary_crossentropy"}   
+        lossWeights = {"map1": 2.0, "map2": 1.0}
+        metrics = {
+            "map1" : dice_coeff,
+            "map2" : iou,
+            "bce" : "binary_crossentropy"}
+        model.compile(optimizer=RMSprop(lr=0.0001), loss=losses, loss_weights=lossWeights, metrics=metrics)
+        return model     
