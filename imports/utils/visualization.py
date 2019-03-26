@@ -20,7 +20,7 @@ from imports.utils.log_progress import log_progress
 # https://stackoverflow.com/questions/9056957/correct-way-to-define-class-variables-in-python
 
 class Visualize():
-    def __init__(self,df,pred_layer,model,input_shape=(512,768,3),masktype='hand'):
+    def __init__(self,df,model,pred_layer=1,input_shape=(512,768,3),masktype='hand'):
         self.df = df
         self.model = model
         self.pred_layer = pred_layer
@@ -147,7 +147,6 @@ class Visualize():
         if self.input_shape[2] == 3: #rgb
             self.img = resize(img,self.input_shape[:2]).reshape(*self.input_shape)
         self.img = img_as_float(self.img)
-        self.img = self.__norm_image(self.img)
 
         if 'mask_path' in self.df:
             if self.masktype == 'hand':
@@ -161,7 +160,7 @@ class Visualize():
     def predict(self):
         if self.model.layers[0].input_shape[1:] != self.input_shape:
             raise ValueError('Modelinput and Image Shape doesnt match \n ' + 'Modelinput Shape is: ' + str(self.model.layers[0].input_shape[1:]) + '\n' + 'Defined Input Shape is: ' + str(self.input_shape))
-
+        self.img = exposure.equalize_adapthist(self.img, clip_limit=0.03)
         tmp_img = self.img.reshape(1,*self.input_shape)
 
         assert self.pred_layer == 1 or self.pred_layer == 2, "pred_layer number not allowed"
@@ -176,53 +175,15 @@ class Visualize():
             self.prediction = img_as_float(self.prediction)
         else:
             self.prediction = img_as_float(self.prediction>self.prediction_threshold)
-
-        #if self.msk != None:
-         #   smooth = 0.0
-         #   y_true_f = np.ndarray.flatten(self.msk.astype(float))
-          #  y_pred_f = np.ndarray.flatten(self.prediction.astype(float))
-          #  intersection = np.sum(y_true_f * y_pred_f)
-          #  self.dice_score = (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+            
+        if self.msk is not None:
+            smooth = 0.0
+            y_true_f = np.ndarray.flatten(self.msk.astype(float))
+            y_pred_f = np.ndarray.flatten(self.prediction.astype(float))
+            intersection = np.sum(y_true_f * y_pred_f)
+            self.dice_score = (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
 
     # https://www.kaggle.com/gauss256/preprocess-images
-
-    def __norm_image(self,img):
-        """
-        Normalize PIL image
-
-        Normalizes luminance to (mean,std)=(0,1), and applies a [1%, 99%] contrast stretch
-        """
-        #img_y, img_b, img_r = img.convert('YCbCr').split()
-        img_y = skimage.color.rgb2ycbcr(img)[:,:,0]
-        img_b = skimage.color.rgb2ycbcr(img)[:,:,1]
-        img_r = skimage.color.rgb2ycbcr(img)[:,:,2]
-
-        #img_y_np = np.asarray(img_y).astype(float)
-        img_y_np = img_y
-
-        img_y_np /= 255
-        img_y_np -= img_y_np.mean()
-        img_y_np /= img_y_np.std()
-        scale = np.max([np.abs(np.percentile(img_y_np, 1.0)),
-                        np.abs(np.percentile(img_y_np, 99.0))])
-        img_y_np = img_y_np / scale
-        img_y_np = np.clip(img_y_np, -1.0, 1.0)
-        img_y_np = (img_y_np + 1.0) / 2.0
-        print(img_y_np.max())
-
-        img_y_np = (img_y_np * 255).astype(np.uint8)
-
-        #img_y = Image.fromarray(img_y_np)
-        img_y = img_y_np
-        print(img_y.max())
-
-        #img_ybr = Image.merge('YCbCr', (img_y, img_b, img_r))
-        img_ybr = np.dstack((img_y, img_b, img_r))
-
-        #img_nrm = img_ybr.convert('RGB')
-        img_nrm = skimage.color.ycbcr2rgb(img_ybr)
-
-        return img_nrm/img_nrm.max()
 
 
     def __adjust_data(self,img):
@@ -246,8 +207,10 @@ class Evaluate(Visualize):
         self.pred_layer = pred_layer
         self.masktype = masktype
         self.prediction_threshold = None
+        #self.dice_score = None
 
     def mean_average_precicion(self,threshold=0.5):
+        precicions = []
         for i in log_progress(range(len(self.df))):
             self.selected_row = self.df.iloc[[i]]
             self.load_data()
@@ -255,7 +218,10 @@ class Evaluate(Visualize):
            # precicion_value = None
            # iou = self.__get_iou(y_true=self.msk,y_pred=self.prediction)
            # print(iou)
-            print(self.iou_metric(y_true_in=self.msk,y_pred_in=self.prediction,print_table=True))
+            precicions.append(self.iou_metric(y_true_in=self.msk,y_pred_in=self.prediction,print_table=False))
+            if i == 5:
+                break
+        return precicions
 
     def __get_iou(self,y_true,y_pred,smooth=1):
         intersection = np.sum(y_true*y_pred)
@@ -307,7 +273,7 @@ class Evaluate(Visualize):
         prec = []
         if print_table:
             print("Thresh\tTP\tFP\tFN\tPrec.")
-        for t in np.arange(0.5, 1.0, 0.05):
+        for t in np.arange(0.2, 1.0, 0.05):
             tp, fp, fn = precision_at(t, iou)
             if (tp + fp + fn) > 0:
                 p = tp / (tp + fp + fn)
@@ -319,7 +285,7 @@ class Evaluate(Visualize):
         
         if print_table:
             print("AP\t-\t-\t-\t{:1.3f}".format(np.mean(prec)))
-        return prec[2]
+        return prec
 
 
     def get_dice_coeff(self,mode='simple'):
