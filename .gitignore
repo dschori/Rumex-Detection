@@ -11,7 +11,10 @@
 ############
 tensorboard/
 .ipynb_checkpoints/
-data/
+00_all/
+01_augmented/
+02_test/
+LabelingTool/
 saved_models/
 _Git_Config/
 _old/
