@@ -4,9 +4,11 @@ from skimage.color import rgb2gray
 from skimage.draw import circle
 from matplotlib.pyplot import imshow, imread, imsave
 import keras
+import tensorflow as tf
 import numpy as np 
 import pandas as pd
 from scipy import ndimage as ndi
+import time
 
 from imports.utils.enums import DATA_BASE_PATH, SHAPE
 
@@ -18,9 +20,10 @@ from skimage.transform import rescale, resize
 # Based on Keras Sequence Class
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
-    def __init__(self, df, augment_data=False, batch_size=2, target_size=SHAPE, shuffle=True,save_images=False, input_channels=3):
+    def __init__(self, df,hist_equal=False, augment_data=False, batch_size=2, target_size=SHAPE, shuffle=True,save_images=False, input_channels=3):
         'Initialization'
         self.df = df
+        self.hist_equal = hist_equal
         self.augment_data = augment_data
         self.batch_size = batch_size
         self.target_size = target_size
@@ -37,8 +40,6 @@ class DataGenerator(keras.utils.Sequence):
 
     def __getitem__(self, index):
         'Generate one batch of data'
-        #print("index: " + str(index))
-        #print("indexes: " + str(indexes))
         # Generate data
         if self.augment_data == True:
             # Generate indexes of the batch
@@ -70,75 +71,33 @@ class DataGenerator(keras.utils.Sequence):
         for _, row in tmp_df.iterrows():
             img = imread(row['image_path']+row['name'])
             msk = imread(row['mask_path']+row['name'])
-            msk_circle = imread(row['mask_cirlce_path']+row['name'])
+            msk_circle = imread(row['row['mask_path']']+row['name'])
+            
+            img = resize(img,self.target_size)
+            msk = resize(msk,self.target_size)
+            msk_circle = resize(msk_circle,self.target_size)
+
+            assert img.shape[2] == 3, "Number of Color Channels must be 3"
             
             if self.input_channels == 1:
                 img = rgb2gray(img)
-            # Adjust Data
-            img, msk, msk_circle = self.__adjust_data(img, msk, msk_circle)
-            #print(msk_circle.shape)
-            imgs[ind,] = resize(img,self.target_size).reshape(*self.target_size,self.input_channels)
-            masks[ind,:,:,0] = resize(msk,self.target_size).reshape(*self.target_size)
-            masks[ind,:,:,1] = resize(msk_circle,self.target_size).reshape(*self.target_size)
+            #t = time.time()
+            img, msk, msk_circle = self.__adjust_data(img, msk, msk_circle) # Adjust Data
+            #elapsed = time.time() - t
+            #sprint(elapsed)
+
+            assert img.max() <= 1.0
+            assert msk.max() <= 1.0
+            assert msk_circle.max() <= 1.0
+
+            imgs[ind,] = img
+            masks[ind,:,:,0] = msk
+            masks[ind,:,:,1] = msk_circle
             ind += 1
 
         return imgs, [masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1), masks[:,:,:,1].reshape(self.batch_size,*self.target_size,1)]
-
-    def __augmented_data_generation(self,tmp_df):
-        for _, row in tmp_df.iterrows():
-            img = imread(row['image_path']+row['name'])
-            msk = imread(row['mask_path']+row['name'])
-            batch_img_aug, batch_msk_aug = self.__augment_image_batch(img,msk)
-            return batch_img_aug, batch_msk_aug
-            # self.__save_batches(batch_image_aug,batch_mask_aug) 
-
-    def __augment_image_batch(self,img,msk):
-        img = skimage.img_as_ubyte(img) #Image needed as int8
-        imgs = [np.copy(img) for _ in range(self.batch_size)]
-        img_batches = [ia.Batch(images=imgs) for _ in range(1)]
-
-        msk = skimage.img_as_ubyte(msk) #Image needed as int8
-        msks = [np.copy(msk) for _ in range(self.batch_size)]
-        msk_batches = [ia.Batch(images=msks) for _ in range(1)] 
-
-        aug = iaa.Sequential([
-            #iaa.HistogramEqualization(),
-            iaa.SomeOf((1, 5), [
-                iaa.GaussianBlur(sigma=(0, 1.5)),
-                iaa.Fliplr(0.8),
-                iaa.Flipud(0.8),
-                iaa.Crop(px=(0, 16)),
-                iaa.Affine(rotate=(-70, 70)),
-                iaa.Add((25)),
-                iaa.PiecewiseAffine(scale=(0.01, 0.04)),
-            ]),
-        ], random_order=True)
-
-        aug = aug.to_deterministic() #Apply same operations to image and mask
-        batch_img_aug = list(aug.augment_batches(img_batches, background=False))  # background=True for multicore aug
-        batch_msk_aug = list(aug.augment_batches(msk_batches, background=False))
-
-        imgs = np.empty((self.batch_size, *self.target_size, self.input_channels))
-        masks = np.empty((self.batch_size, *self.target_size, 1))
-
-        for image in range(self.batch_size):
-                tmp_img = skimage.img_as_float(batch_img_aug[0].images_aug[image])
-                tmp_img = skimage.color.rgb2gray(tmp_img)
-                tmp_msk = skimage.img_as_float(batch_msk_aug[0].images_aug[image])
-                tmp_msk = skimage.color.rgb2gray(tmp_msk)
-                tmp_msk = tmp_msk/tmp_msk.max()
-                tmp_msk = tmp_msk > 0.95
-                img, msk = self.__adjust_data(tmp_img, tmp_msk)
-                if self.save_images == True:
-                    self.__save_data(tmp_img,tmp_msk)
-                imgs[image,] = resize(tmp_img,(self.target_size[0],self.target_size[1])).reshape(*self.target_size,self.input_channels)
-                masks[image,] = resize(tmp_msk,(self.target_size[0],self.target_size[1])).reshape(*self.target_size,1)
-
-        return imgs, masks
     
     def __adjust_data(self,img,mask, msk_circle):
-        # Apply HistogramEqualization:
-        img = exposure.equalize_hist(img)
         if len(mask.shape) == 3:
             mask = rgb2gray(mask)
         if len(msk_circle.shape) == 3:
@@ -149,6 +108,9 @@ class DataGenerator(keras.utils.Sequence):
             mask = mask / 255
         if msk_circle.max() > 1.0:
             msk_circle = msk_circle / 255
+        if self.hist_equal == True:
+            img = exposure.equalize_adapthist(img, clip_limit=0.03)
+
         mask[mask > 0.5] = 1
         mask[mask <= 0.5] = 0
         return (img,mask,msk_circle)
