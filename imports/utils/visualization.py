@@ -13,6 +13,8 @@ import pandas as pd
 from skimage import exposure
 from PIL import Image
 import skimage
+import skimage.measure
+import matplotlib.patches as patches
 
 from imports.utils.enums import DATA_BASE_PATH, SHAPE
 from imports.utils.log_progress import log_progress
@@ -125,6 +127,19 @@ class Visualize():
             ax.imshow(self.img, interpolation='none')
             ax.imshow(self.prediction, interpolation='none',alpha=0.2)
             ax.imshow(self.error,cmap='Reds', alpha=0.4, interpolation='none')
+        if self.mode == "image_prediction_roots":
+            self.predict()
+            root_coords, root_bbox = self.predict_roots()
+            for c,b in zip(root_coords,root_bbox):
+                width = b[3] - b[1]
+                height = b[2] - b[0]
+                rect = patches.Rectangle((b[1],b[0]),width,height,
+                                        linewidth=4,edgecolor='b',facecolor='None')
+                circ = patches.Circle(c[::-1],10,facecolor='yellow')
+                ax.add_patch(rect)
+                ax.add_patch(circ)
+            ax.imshow(self.img,cmap='gray')
+            ax.imshow(self.msk, alpha=0.3)
         if self.mode == 'normalized_gray':
             norm = rgb2gray(self.img)
             norm = (norm-np.mean(norm))/np.std(norm)
@@ -156,6 +171,18 @@ class Visualize():
             
             self.msk = resize(msk,self.input_shape[:2]).reshape(*self.input_shape[:2])
             self.msk = img_as_float(self.msk)
+
+    def predict_roots(self):
+        pred = self.prediction > 0.5
+        labels = skimage.measure.label(pred)
+        roots = skimage.measure.regionprops(labels)
+        roots = [r for r in roots if r.area > 2000]
+        if len(roots) == 0:
+            return None
+        else:
+            root_coords = [r.centroid for r in roots]
+            root_bbox = [r.bbox for r in roots]
+            return root_coords, root_bbox
         
     def predict(self):
         if self.model.layers[0].input_shape[1:] != self.input_shape:
@@ -305,6 +332,22 @@ class Evaluate(Visualize):
             return min(dice_coeffs), max(dice_coeffs), sum(dice_coeffs)/len(dice_coeffs)
         elif mode == 'raw':
             return dice_coeffs
+
+    def get_root_precicion(self,index):
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        self.load_data()
+        self.predict()
+        print((list(self.selected_row["roots"].values/2)[0]))
+        pred = self.prediction > 0.5
+        labels = skimage.measure.label(pred)
+        roots = skimage.measure.regionprops(labels)
+        roots = [r for r in roots if r.area > 2000]
+
+        if len(roots) == 0:
+            return None
+        else:
+            root_coords = [r.centroid for r in roots]
+            return root_coords
 
 
     def get_false_negative_mask(self,index):
