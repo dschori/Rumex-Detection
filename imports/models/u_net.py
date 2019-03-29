@@ -267,3 +267,7 @@ def get_unet_mod(input_shape=(1024, 1024, 3),num_classes=1):
             "bce" : "binary_crossentropy"}
         model.compile(optimizer=RMSprop(lr=0.0001), loss=losses, loss_weights=lossWeights, metrics=metrics)
         return model     
+
+
+def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
+    pass

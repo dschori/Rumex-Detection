@@ -15,6 +15,8 @@ from PIL import Image
 import skimage
 import skimage.measure
 import matplotlib.patches as patches
+from scipy.spatial import distance_matrix
+from skimage.draw import circle
 
 from imports.utils.enums import DATA_BASE_PATH, SHAPE
 from imports.utils.log_progress import log_progress
@@ -54,6 +56,13 @@ class Visualize():
         self.load_data()
         return self.msk
 
+    def get_roots(self,index):
+        if index == 'random':
+            raise ValueError('Random not supported here!')
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        for r in self.selected_row["roots"].values[0]:
+            pass
+            
     def get_prediction(self,index):
         if index == 'random':
             raise ValueError('Random not supported here!')
@@ -334,20 +343,27 @@ class Evaluate(Visualize):
             return dice_coeffs
 
     def get_root_precicion(self,index):
+        assert self.pred_layer == 2, "Wrong Prediction Layer"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         self.predict()
-        print((list(self.selected_row["roots"].values/2)[0]))
+        roots_true = (list(self.selected_row["roots"].values/2)[0])
+        roots_true = [list(list(t)) for t in roots_true] #Convert to same format
         pred = self.prediction > 0.5
         labels = skimage.measure.label(pred)
-        roots = skimage.measure.regionprops(labels)
-        roots = [r for r in roots if r.area > 2000]
-
-        if len(roots) == 0:
-            return None
+        roots_pred = skimage.measure.regionprops(labels)
+        roots_pred = [r for r in roots_pred if r.area > 2000]
+        roots_pred = [r.centroid for r in roots_pred]
+        roots_pred = [list(p) for p in roots_pred] #Convert to same format
+        roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y
+        
+        #distance_matrix(roots_true, roots_pred)
+        if len(roots_pred) > 0 and len(roots_true) > 0:
+            errors = sum(distance_matrix(roots_true, roots_pred).min(axis=1)>60)
+            correct = sum(distance_matrix(roots_true, roots_pred).min(axis=1)<=60)
+            return errors, correct
         else:
-            root_coords = [r.centroid for r in roots]
-            return root_coords
+            return 0, 0
 
 
     def get_false_negative_mask(self,index):
