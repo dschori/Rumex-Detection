@@ -71,7 +71,7 @@ class DataGenerator(keras.utils.Sequence):
         for _, row in tmp_df.iterrows():
             img = imread(row['image_path']+row['name'])
             msk = imread(row['mask_path']+row['name'])
-            msk_circle = imread(row['row['mask_path']']+row['name'])
+            msk_circle = imread(row['mask_path']+row['name'])
             
             img = resize(img,self.target_size)
             msk = resize(msk,self.target_size)
@@ -95,7 +95,8 @@ class DataGenerator(keras.utils.Sequence):
             masks[ind,:,:,1] = msk_circle
             ind += 1
 
-        return imgs, [masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1), masks[:,:,:,1].reshape(self.batch_size,*self.target_size,1)]
+        return imgs, masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1)
+        #return imgs, [masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1), masks[:,:,:,1].reshape(self.batch_size,*self.target_size,1)]
     
     def __adjust_data(self,img,mask, msk_circle):
         if len(mask.shape) == 3:
