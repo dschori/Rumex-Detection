@@ -198,75 +198,63 @@ def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
 ### TODO: Implement Unet as proposed in: https://arxiv.org/abs/1505.04597
 
 def down_block(input,n_feature_maps):
-    down = Conv2D(n_feature_maps, (3, 3), padding='same')(input)
-    down = BatchNormalization()(down)
-    down = Activation('relu')(down)
-    down = Conv2D(n_feature_maps, (3, 3), padding='same')(down)
-    down = BatchNormalization()(down)
-    down = Activation('relu')(down)
+    down = input
+    for _ in range(2):
+        down = Conv2D(n_feature_maps, (3, 3), padding='same')(down)
+        down = BatchNormalization()(down)
+        down = Activation('relu')(down)
+
     concat_layer = down
     down = MaxPooling2D((2, 2), strides=(2, 2))(down)
     return down, concat_layer
 
 def up_block(input,concat_layer,n_feature_maps):
     up = UpSampling2D((2, 2))(input)
+    print(up)
+    print(concat_layer)
     up = concatenate([concat_layer, up], axis=3)
-    up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
-    up = BatchNormalization()(up)
-    up = Activation('relu')(up)
-    up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
-    up = BatchNormalization()(up)
-    up = Activation('relu')(up)
-    up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
-    up = BatchNormalization()(up)
-    up = Activation('relu')(up)
+    for _ in range(3):
+        up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
+        up = BatchNormalization()(up)
+        up = Activation('relu')(up)
     return up
 
 def get_unet_mod(input_shape=(1024, 1024, 3),num_classes=1):
     concats_list = []
-    feature_maps = [8,16,32,64,128,256,512] #without center
+    feature_maps = [16,32,64,128,256] #without center
     input = Input(shape=input_shape)
     origin = input
     
     # downsampling:
-    for d in range(len(feature_maps)):
-        output, concat_layer = down_block(input,feature_maps[d])
+    for f in feature_maps:
+        output, concat_layer = down_block(input,f)
         input = output
         concats_list.append(concat_layer)
 
+    
+    down_feature_maps = feature_maps
+
     # center
-    center = Conv2D(feature_maps[-1]*2, (3, 3), padding='same')(output)
+    center = Conv2D(512, (3, 3), padding='same')(input)
     center = BatchNormalization()(center)
     center = Activation('relu')(center)
-    center = Conv2D(feature_maps[-1]*2, (3, 3), padding='same')(center)
+    center = Conv2D(512, (3, 3), padding='same')(center)
     center = BatchNormalization()(center)
     center = Activation('relu')(center)
     input = center
-    print(concats_list[0])
+    #print(feature_maps[-1]*2)
+
     # upsampling:
-    for u in range(len(feature_maps)):
-        ouput = up_block(input,concats_list[::-1][u],feature_maps[::-1][u])
+    for f,c in zip(down_feature_maps[::-1],concats_list[::-1]):
+       
+        ouput = up_block(input,c,f)
         input = output
 
-    if num_classes == 1:
-        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(output)
-        model = Model(inputs=origin, outputs=map1)
-        model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
-        return model
-    elif num_classes == 2:
-        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(output)
-        map2 = Conv2D(1, (1, 1), activation='sigmoid',name="map2")(output)
-        model = Model(inputs=origin, outputs=[map1, map2],)
-        losses = {
-        "map1": bce_dice_loss,
-        "map2": "binary_crossentropy"}   
-        lossWeights = {"map1": 2.0, "map2": 1.0}
-        metrics = {
-            "map1" : dice_coeff,
-            "map2" : iou,
-            "bce" : "binary_crossentropy"}
-        model.compile(optimizer=RMSprop(lr=0.0001), loss=losses, loss_weights=lossWeights, metrics=metrics)
-        return model     
+    final_layer = Conv2D(num_classes, (1, 1), activation='sigmoid')(output)
+    final_layer = Activation("sigmoid")(final_layer)
+    model = Model(inputs=origin, outputs=final_layer)
+    model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+    return model    
 
 
 def get_unet_pretrained(input_shape=(1024, 1024, 3),num_classes=1):

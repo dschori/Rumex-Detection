@@ -46,8 +46,8 @@ class DataGenerator(keras.utils.Sequence):
                 ]),
                 iaa.Fliplr(0.5, name="to_mask"),
                 iaa.Flipud(0.5, name="to_mask"),
-                iaa.Crop(px=(0, 6), name="to_mask"),
-                iaa.Affine(scale=(0.5,1.0),translate_percent={"x": (-0.3, 0.3), "y": (-0.3, 0.3)}, name="to_mask"),
+                #iaa.Crop(px=(0, 6), name="to_mask"),
+                iaa.Affine(scale=(0.7,1.0),translate_percent={"x": (-0.3, 0.3), "y": (-0.3, 0.3)}, name="to_mask"),
             ]),
         ], random_order=True)
         self.seq_img = iaa.Sequential([
