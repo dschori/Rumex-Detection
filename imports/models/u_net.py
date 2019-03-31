@@ -271,7 +271,7 @@ def get_unet_mod(input_shape=(1024, 1024, 3),num_classes=1):
 
 def get_unet_pretrained(input_shape=(1024, 1024, 3),num_classes=1):
     from keras.applications.vgg16 import VGG16 as PTModel
-    base_pretrained_model = PTModel(input_shape =  (512,768,3), include_top = False, weights = 'imagenet')
+    base_pretrained_model = PTModel(input_shape =  (512,512,3), include_top = False, weights = 'imagenet')
     base_pretrained_model.trainable = False
 
     from collections import defaultdict, OrderedDict
@@ -292,11 +292,11 @@ def get_unet_pretrained(input_shape=(1024, 1024, 3),num_classes=1):
     pretrained_encoder = Model(inputs = base_pretrained_model.get_input_at(0), 
                             outputs = [v[-1].get_output_at(0) for k, v in layer_size_dict.items()])
     pretrained_encoder.trainable = False
-    n_outputs = pretrained_encoder.predict([np.zeros((1,512,768,3))])
+    n_outputs = pretrained_encoder.predict([np.zeros((1,512,512,3))])
 
     from keras.layers import Input, Conv2D, concatenate, UpSampling2D, BatchNormalization, Activation, Cropping2D, ZeroPadding2D
-    x_wid, y_wid = (512,768)
-    in_t0 = Input((512,768,3), name = 'T0_Image')
+    x_wid, y_wid = (512,512)
+    in_t0 = Input((512,512,3), name = 'T0_Image')
     wrap_encoder = lambda i_layer: {k: v for k, v in zip(layer_size_dict.keys(), pretrained_encoder(i_layer))}
 
     t0_outputs = wrap_encoder(in_t0)
@@ -319,7 +319,7 @@ def get_unet_pretrained(input_shape=(1024, 1024, 3),num_classes=1):
             x = concatenate([cur_layer, x])
         last_layer = x
     final_output = Conv2D(1, kernel_size=(1,1), padding = 'same', activation = 'sigmoid')(last_layer)
-    crop_size = 20
+    crop_size = 1
     final_output = Cropping2D((crop_size, crop_size))(final_output)
     final_output = ZeroPadding2D((crop_size, crop_size))(final_output)
     unet_model = Model(inputs = [in_t0],
@@ -338,6 +338,12 @@ def get_unet_pretrained(input_shape=(1024, 1024, 3),num_classes=1):
         return K.sum(K.flatten(y_true)*K.flatten(K.round(y_pred)))/K.sum(y_true)
 
     unet_model.compile(optimizer=Adam(1e-3, decay = 1e-6), 
-                    loss=dice_p_bce, 
-                    metrics=[dice_coef, 'binary_accuracy', true_positive_rate])
+                    loss=bce_dice_loss, 
+                    metrics=[dice_coeff, 'binary_accuracy', true_positive_rate])
     return unet_model
+
+
+def get_unet_pretrained2(input_shape=(1024, 1024, 3),num_classes=1):
+    from keras.applications.ResNet50 import ResNet50 as PTModel
+    base_pretrained_model = PTModel(input_shape =  (512,512,3), include_top = False, weights = 'imagenet')
+    base_pretrained_model.trainable = False

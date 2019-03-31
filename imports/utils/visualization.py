@@ -20,6 +20,8 @@ from skimage.draw import circle
 
 from imports.utils.enums import DATA_BASE_PATH, SHAPE
 from imports.utils.log_progress import log_progress
+import imgaug as ia
+from imgaug import augmenters as iaa
 
 # https://stackoverflow.com/questions/9056957/correct-way-to-define-class-variables-in-python
 
@@ -41,6 +43,10 @@ class Visualize():
         self.model_shape = None
         assert masktype=='auto' or masktype=='hand', 'Masktype not allowed'
         self.masktype = masktype
+        self.seq_norm = iaa.Sequential([
+            iaa.CLAHE(),
+            iaa.LinearContrast(alpha=1.0)
+        ])
 
     def get_image(self,index):
         if index == 'random':
@@ -139,14 +145,15 @@ class Visualize():
         if self.mode == "image_prediction_roots":
             self.predict()
             root_coords, root_bbox = self.predict_roots()
-            for c,b in zip(root_coords,root_bbox):
-                width = b[3] - b[1]
-                height = b[2] - b[0]
-                rect = patches.Rectangle((b[1],b[0]),width,height,
-                                        linewidth=4,edgecolor='b',facecolor='None')
-                circ = patches.Circle(c[::-1],10,facecolor='yellow')
-                ax.add_patch(rect)
-                ax.add_patch(circ)
+            if root_coords is not None:
+                for c,b in zip(root_coords,root_bbox):
+                    width = b[3] - b[1]
+                    height = b[2] - b[0]
+                    rect = patches.Rectangle((b[1],b[0]),width,height,
+                                            linewidth=4,edgecolor='b',facecolor='None')
+                    circ = patches.Circle(c[::-1],10,facecolor='yellow')
+                    ax.add_patch(rect)
+                    ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
             ax.imshow(self.msk, alpha=0.3)
         if self.mode == 'normalized_gray':
@@ -187,7 +194,7 @@ class Visualize():
         roots = skimage.measure.regionprops(labels)
         roots = [r for r in roots if r.area > 2000]
         if len(roots) == 0:
-            return None
+            return None, None
         else:
             root_coords = [r.centroid for r in roots]
             root_bbox = [r.bbox for r in roots]
@@ -196,15 +203,20 @@ class Visualize():
     def predict(self):
         if self.model.layers[0].input_shape[1:] != self.input_shape:
             raise ValueError('Modelinput and Image Shape doesnt match \n ' + 'Modelinput Shape is: ' + str(self.model.layers[0].input_shape[1:]) + '\n' + 'Defined Input Shape is: ' + str(self.input_shape))
-        self.img = exposure.equalize_adapthist(self.img, clip_limit=0.03)
+        #self.img = exposure.equalize_adapthist(self.img, clip_limit=0.03)
+        
+        self.img = (self.img*255).astype("uint8")
+        self.img = self.seq_norm.augment_image(self.img)
+        self.img = self.img.astype(float)/255.0
+        
         tmp_img = self.img.reshape(1,*self.input_shape)
 
         assert self.pred_layer == 1 or self.pred_layer == 2, "pred_layer number not allowed"
         
         if self.pred_layer == 1:
-            self.prediction = self.model.predict(tmp_img)[0]
+            self.prediction = self.model.predict(tmp_img)[:,:,:,0]
         elif self.pred_layer == 2:
-            self.prediction = self.model.predict(tmp_img)[1]
+            self.prediction = self.model.predict(tmp_img)[:,:,:,1]
 
         self.prediction = self.prediction.reshape(*self.input_shape[:2])
         if self.prediction_threshold == None:
@@ -243,6 +255,10 @@ class Evaluate(Visualize):
         self.pred_layer = pred_layer
         self.masktype = masktype
         self.prediction_threshold = None
+        self.seq_norm = iaa.Sequential([
+            iaa.CLAHE(),
+            iaa.LinearContrast(alpha=1.0)
+        ])
         #self.dice_score = None
 
     def mean_average_precicion(self,threshold=0.5):
@@ -359,8 +375,8 @@ class Evaluate(Visualize):
         
         #distance_matrix(roots_true, roots_pred)
         if len(roots_pred) > 0 and len(roots_true) > 0:
-            errors = sum(distance_matrix(roots_true, roots_pred).min(axis=1)>60)
-            correct = sum(distance_matrix(roots_true, roots_pred).min(axis=1)<=60)
+            errors = sum(distance_matrix(roots_true, roots_pred).min(axis=1)>80)
+            correct = sum(distance_matrix(roots_true, roots_pred).min(axis=1)<=80)
             return errors, correct
         else:
             return 0, 0
