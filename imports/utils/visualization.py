@@ -155,7 +155,7 @@ class Visualize():
                     ax.add_patch(rect)
                     ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
-            ax.imshow(self.msk, alpha=0.3)
+            ax.imshow(self.msk, alpha=0.2)
         if self.mode == 'normalized_gray':
             norm = rgb2gray(self.img)
             norm = (norm-np.mean(norm))/np.std(norm)
@@ -187,6 +187,8 @@ class Visualize():
             
             self.msk = resize(msk,self.input_shape[:2]).reshape(*self.input_shape[:2])
             self.msk = img_as_float(self.msk)
+        else:
+            self.msk = np.zeros(self.input_shape[:2])
 
     def predict_roots(self):
         pred = self.prediction > 0.5
@@ -375,11 +377,11 @@ class Evaluate(Visualize):
         
         #distance_matrix(roots_true, roots_pred)
         if len(roots_pred) > 0 and len(roots_true) > 0:
-            errors = sum(distance_matrix(roots_true, roots_pred).min(axis=1)>80)
-            correct = sum(distance_matrix(roots_true, roots_pred).min(axis=1)<=80)
-            return errors, correct
+            errors = sum(distance_matrix(roots_true, roots_pred).min(axis=1)>60)
+            correct = sum(distance_matrix(roots_true, roots_pred).min(axis=1)<=60)
+            return errors, correct, np.round(max(distance_matrix(roots_true, roots_pred).min(axis=1)),1)
         else:
-            return 0, 0
+            return 0, 0, 0
 
 
     def get_false_negative_mask(self,index):
