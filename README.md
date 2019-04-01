@@ -15,3 +15,4 @@ Required Packages:
 - sklearn
 - matplotlib
 - cv2
+- segmentation-models
