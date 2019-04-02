@@ -151,8 +151,12 @@ class Visualize():
                     height = b[2] - b[0]
                     rect = patches.Rectangle((b[1],b[0]),width,height,
                                             linewidth=4,edgecolor='b',facecolor='None')
-                    circ = patches.Circle(c[::-1],10,facecolor='yellow')
+                    circ = patches.Circle(c[::-1],60,facecolor='red')
                     ax.add_patch(rect)
+                    ax.add_patch(circ)
+                for root_y in self.selected_row["roots"].values[0]/2:
+                   # print(root_y)
+                    circ = patches.Circle(tuple(root_y),5,facecolor='yellow')
                     ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
             ax.imshow(self.msk, alpha=0.2)
@@ -360,7 +364,7 @@ class Evaluate(Visualize):
         elif mode == 'raw':
             return dice_coeffs
 
-    def get_root_precicion(self,index):
+    def get_root_precicion(self,index,tolerance=60,print_distance_matrix=False):
         assert self.pred_layer == 2, "Wrong Prediction Layer"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
@@ -374,14 +378,64 @@ class Evaluate(Visualize):
         roots_pred = [r.centroid for r in roots_pred]
         roots_pred = [list(p) for p in roots_pred] #Convert to same format
         roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y
-        
-        #distance_matrix(roots_true, roots_pred)
+
         if len(roots_pred) > 0 and len(roots_true) > 0:
-            errors = sum(distance_matrix(roots_true, roots_pred).min(axis=1)>60)
-            correct = sum(distance_matrix(roots_true, roots_pred).min(axis=1)<=60)
-            return errors, correct, np.round(max(distance_matrix(roots_true, roots_pred).min(axis=1)),1)
+            # if there are both roots in the image and we are also predict at least one:
+            ds = distance_matrix(roots_true, roots_pred)
+
+            if print_distance_matrix == True:
+                print(ds)
+
+            all_errors = sum(ds.min(axis=1)>tolerance)
+            tP = sum(ds.min(axis=1)<=tolerance)
+            combined = 0
+
+            if tP > ds.shape[1]:
+                combined = abs(tP-ds.shape[1])
+                tP -= combined
+
+            if all_errors > 0:
+                fP = ds.shape[1]-tP
+                fN = ds.shape[0]-tP
+                fN -= combined
+            else:
+                fP = 0
+                fN = 0
+            
+            precision = tP / (tP+fP)
+            recall = tP / (tP+fN)
+
+        elif len(roots_true) == 0 and len(roots_pred) > 0:
+            # If there are no roots in image but we predict some:
+            tP = 0
+            fN = 0
+            fP = len(roots_pred)
+            precision = 0.0
+            recall = 0.0
+
+        elif len(roots_true) > 0 and len(roots_pred) == 0:
+            # If there are roots in the image but we predict none:
+            tP = 0
+            fN = len(roots_pred)
+            fP = 0
+            precision = 0.0
+            recall = 0.0
+
         else:
-            return 0, 0, 0
+            # If there are neither roots in the image and prediction:
+            tp = 0
+            fN = 0
+            fP = 0
+            precicion = 1.0
+            recall = 1.0
+        
+        return tP, fP, fN, precision, recall
+
+    def calculate_p_r(self,df,range_roots_per_image=range(1,6)):
+        for rr in range_roots_per_image:
+            for _ , row in df.iterrows():
+                if len(row['roots']) >= rr:
+                    tP, fP, fN, precicion, recall = self.get_root_precicion(row["name"])
 
 
     def get_false_negative_mask(self,index):

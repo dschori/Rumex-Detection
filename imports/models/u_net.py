@@ -210,8 +210,6 @@ def down_block(input,n_feature_maps):
 
 def up_block(input,concat_layer,n_feature_maps):
     up = UpSampling2D((2, 2))(input)
-    print(up)
-    print(concat_layer)
     up = concatenate([concat_layer, up], axis=3)
     for _ in range(3):
         up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
@@ -219,9 +217,10 @@ def up_block(input,concat_layer,n_feature_maps):
         up = Activation('relu')(up)
     return up
 
-def get_unet_mod(input_shape=(1024, 1024, 3),num_classes=1):
+def get_unet_mod(input_shape=(1024, 1024, 3),
+                feature_maps=[16,32,64,128,256],
+                num_classes=1):
     concats_list = []
-    feature_maps = [16,32,64,128,256] #without center
     input = Input(shape=input_shape)
     origin = input
     
@@ -231,23 +230,17 @@ def get_unet_mod(input_shape=(1024, 1024, 3),num_classes=1):
         input = output
         concats_list.append(concat_layer)
 
-    
-    down_feature_maps = feature_maps
-
     # center
-    center = Conv2D(512, (3, 3), padding='same')(input)
-    center = BatchNormalization()(center)
-    center = Activation('relu')(center)
-    center = Conv2D(512, (3, 3), padding='same')(center)
-    center = BatchNormalization()(center)
-    center = Activation('relu')(center)
-    input = center
-    #print(feature_maps[-1]*2)
+    center = input
+    for _ in range(2):
+        center = Conv2D(feature_maps[-1]*2, (3, 3), padding='same')(center)
+        center = BatchNormalization()(center)
+        center = Activation('relu')(center)
 
+    input = center
     # upsampling:
-    for f,c in zip(down_feature_maps[::-1],concats_list[::-1]):
-       
-        ouput = up_block(input,c,f)
+    for f,c in zip(feature_maps[::-1],concats_list[::-1]):
+        output = up_block(input,c,f)
         input = output
 
     final_layer = Conv2D(num_classes, (1, 1), activation='sigmoid')(output)
@@ -256,82 +249,3 @@ def get_unet_mod(input_shape=(1024, 1024, 3),num_classes=1):
     model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
     return model    
 
-
-def get_unet_pretrained(input_shape=(1024, 1024, 3),num_classes=1):
-    from keras.applications.vgg16 import VGG16 as PTModel
-    base_pretrained_model = PTModel(input_shape =  (512,512,3), include_top = False, weights = 'imagenet')
-    base_pretrained_model.trainable = False
-
-    from collections import defaultdict, OrderedDict
-    from keras.models import Model
-    layer_size_dict = defaultdict(list)
-    inputs = []
-    for lay_idx, c_layer in enumerate(base_pretrained_model.layers):
-        if not c_layer.__class__.__name__ == 'InputLayer':
-            layer_size_dict[c_layer.get_output_shape_at(0)[1:3]] += [c_layer]
-        else:
-            inputs += [c_layer]
-    # freeze dict
-    layer_size_dict = OrderedDict(layer_size_dict.items())
-    for k,v in layer_size_dict.items():
-        print(k, [w.__class__.__name__ for w in v])
-
-    # take the last layer of each shape and make it into an output
-    pretrained_encoder = Model(inputs = base_pretrained_model.get_input_at(0), 
-                            outputs = [v[-1].get_output_at(0) for k, v in layer_size_dict.items()])
-    pretrained_encoder.trainable = False
-    n_outputs = pretrained_encoder.predict([np.zeros((1,512,512,3))])
-
-    from keras.layers import Input, Conv2D, concatenate, UpSampling2D, BatchNormalization, Activation, Cropping2D, ZeroPadding2D
-    x_wid, y_wid = (512,512)
-    in_t0 = Input((512,512,3), name = 'T0_Image')
-    wrap_encoder = lambda i_layer: {k: v for k, v in zip(layer_size_dict.keys(), pretrained_encoder(i_layer))}
-
-    t0_outputs = wrap_encoder(in_t0)
-    lay_dims = sorted(t0_outputs.keys(), key = lambda x: x[0])
-    skip_layers = 2
-    last_layer = None
-    for k in lay_dims[skip_layers:]:
-        cur_layer = t0_outputs[k]
-        channel_count = cur_layer._keras_shape[-1]
-        cur_layer = Conv2D(channel_count//2, kernel_size=(3,3), padding = 'same', activation = 'linear')(cur_layer)
-        cur_layer = BatchNormalization()(cur_layer) # gotta keep an eye on that internal covariant shift
-        cur_layer = Activation('relu')(cur_layer)
-        
-        if last_layer is None:
-            x = cur_layer
-        else:
-            last_channel_count = last_layer._keras_shape[-1]
-            x = Conv2D(last_channel_count//2, kernel_size=(3,3), padding = 'same')(last_layer)
-            x = UpSampling2D((2, 2))(x)
-            x = concatenate([cur_layer, x])
-        last_layer = x
-    final_output = Conv2D(1, kernel_size=(1,1), padding = 'same', activation = 'sigmoid')(last_layer)
-    crop_size = 1
-    final_output = Cropping2D((crop_size, crop_size))(final_output)
-    final_output = ZeroPadding2D((crop_size, crop_size))(final_output)
-    unet_model = Model(inputs = [in_t0],
-                    outputs = [final_output])
-
-    import keras.backend as K
-    from keras.optimizers import Adam
-    from keras.losses import binary_crossentropy
-    def dice_coef(y_true, y_pred, smooth=1):
-        intersection = K.sum(y_true * y_pred, axis=[1,2,3])
-        union = K.sum(y_true, axis=[1,2,3]) + K.sum(y_pred, axis=[1,2,3])
-        return K.mean( (2. * intersection + smooth) / (union + smooth), axis=0)
-    def dice_p_bce(in_gt, in_pred):
-        return 0.0*binary_crossentropy(in_gt, in_pred) - dice_coef(in_gt, in_pred)
-    def true_positive_rate(y_true, y_pred):
-        return K.sum(K.flatten(y_true)*K.flatten(K.round(y_pred)))/K.sum(y_true)
-
-    unet_model.compile(optimizer=Adam(1e-3, decay = 1e-6), 
-                    loss=bce_dice_loss, 
-                    metrics=[dice_coeff, 'binary_accuracy', true_positive_rate])
-    return unet_model
-
-
-def get_unet_pretrained2(input_shape=(1024, 1024, 3),num_classes=1):
-    from keras.applications.ResNet50 import ResNet50 as PTModel
-    base_pretrained_model = PTModel(input_shape =  (512,512,3), include_top = False, weights = 'imagenet')
-    base_pretrained_model.trainable = False
