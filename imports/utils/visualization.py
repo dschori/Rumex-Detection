@@ -151,7 +151,7 @@ class Visualize():
                     height = b[2] - b[0]
                     rect = patches.Rectangle((b[1],b[0]),width,height,
                                             linewidth=4,edgecolor='b',facecolor='None')
-                    circ = patches.Circle(c[::-1],60,facecolor='red')
+                    circ = patches.Circle(c[::-1],10,facecolor='red')
                     ax.add_patch(rect)
                     ax.add_patch(circ)
                 for root_y in self.selected_row["roots"].values[0]/2:
@@ -159,7 +159,7 @@ class Visualize():
                     circ = patches.Circle(tuple(root_y),5,facecolor='yellow')
                     ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
-            ax.imshow(self.msk, alpha=0.2)
+            ax.imshow(self.msk, alpha=0.4)
         if self.mode == 'normalized_gray':
             norm = rgb2gray(self.img)
             norm = (norm-np.mean(norm))/np.std(norm)
@@ -267,84 +267,6 @@ class Evaluate(Visualize):
         ])
         #self.dice_score = None
 
-    def mean_average_precicion(self,threshold=0.5):
-        precicions = []
-        for i in log_progress(range(len(self.df))):
-            self.selected_row = self.df.iloc[[i]]
-            self.load_data()
-            self.predict()
-           # precicion_value = None
-           # iou = self.__get_iou(y_true=self.msk,y_pred=self.prediction)
-           # print(iou)
-            precicions.append(self.iou_metric(y_true_in=self.msk,y_pred_in=self.prediction,print_table=False))
-            if i == 5:
-                break
-        return precicions
-
-    def __get_iou(self,y_true,y_pred,smooth=1):
-        intersection = np.sum(y_true*y_pred)
-        #intersection = np.sum(np.abs(y_true * y_pred), axis=-1)
-        union = (np.sum(y_true) + np.sum(y_pred)) - intersection
-        iou = (intersection + smooth) / ( union + smooth)
-        return iou
-
-    
-    def iou_metric(self,y_true_in, y_pred_in, print_table=False):
-        # https://www.kaggle.com/aglotero/another-iou-metric
-
-        from skimage.morphology import label
-        labels = label(y_true_in > 0.5)
-        y_pred = label(y_pred_in > 0.5)
-        
-        true_objects = len(np.unique(labels))
-        pred_objects = len(np.unique(y_pred))
-
-        intersection = np.histogram2d(labels.flatten(), y_pred.flatten(), bins=(true_objects, pred_objects))[0]
-
-        # Compute areas (needed for finding the union between all objects)
-        area_true = np.histogram(labels, bins = true_objects)[0]
-        area_pred = np.histogram(y_pred, bins = pred_objects)[0]
-        area_true = np.expand_dims(area_true, -1)
-        area_pred = np.expand_dims(area_pred, 0)
-
-        # Compute union
-        union = area_true + area_pred - intersection
-
-        # Exclude background from the analysis
-        intersection = intersection[1:,1:]
-        union = union[1:,1:]
-        union[union == 0] = 1e-9
-
-        # Compute the intersection over union
-        iou = intersection / union
-
-        # Precision helper function
-        def precision_at(threshold, iou):
-            matches = iou > threshold
-            true_positives = np.sum(matches, axis=1) == 1   # Correct objects
-            false_positives = np.sum(matches, axis=0) == 0  # Missed objects
-            false_negatives = np.sum(matches, axis=1) == 0  # Extra objects
-            tp, fp, fn = np.sum(true_positives), np.sum(false_positives), np.sum(false_negatives)
-            return tp, fp, fn
-
-        # Loop over IoU thresholds
-        prec = []
-        if print_table:
-            print("Thresh\tTP\tFP\tFN\tPrec.")
-        for t in np.arange(0.2, 1.0, 0.05):
-            tp, fp, fn = precision_at(t, iou)
-            if (tp + fp + fn) > 0:
-                p = tp / (tp + fp + fn)
-            else:
-                p = 0
-            if print_table:
-                print("{:1.3f}\t{}\t{}\t{}\t{:1.3f}".format(t, tp, fp, fn, p))
-            prec.append(p)
-        
-        if print_table:
-            print("AP\t-\t-\t-\t{:1.3f}".format(np.mean(prec)))
-        return prec
-
 
     def get_dice_coeff(self,mode='simple'):
         assert mode=='simple' or mode=='raw', 'Mode must be "simple" or "raw"'
@@ -423,10 +345,10 @@ class Evaluate(Visualize):
 
         else:
             # If there are neither roots in the image and prediction:
-            tp = 0
+            tP = 0
             fN = 0
             fP = 0
-            precicion = 1.0
+            precision = 1.0
             recall = 1.0
         
         return tP, fP, fN, precision, recall
