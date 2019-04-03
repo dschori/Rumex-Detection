@@ -243,7 +243,7 @@ def get_unet_mod(input_shape=(1024, 1024, 3),
         output = up_block(input,c,f)
         input = output
 
-    final_layer = Conv2D(num_classes, (1, 1), activation='sigmoid')(output)
+    final_layer = Conv2D(num_classes, (3, 3), padding='same')(output)
     final_layer = Activation("sigmoid")(final_layer)
     model = Model(inputs=origin, outputs=final_layer)
     model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
