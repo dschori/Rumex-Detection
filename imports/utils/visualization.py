@@ -302,6 +302,7 @@ class Evaluate(Visualize):
         return roots_pred
 
     def get_root_pred_coord_v2(self,prediction):
+        # https://www.pyimagesearch.com/2015/11/02/watershed-opencv/
         pred = (prediction*255).astype("uint8")
         tmp = np.zeros((512,768,3),dtype="uint8")
         tmp[:,:,0] = pred

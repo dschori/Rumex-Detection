@@ -19,6 +19,8 @@ LabelingTool/
 saved_models/
 _Git_Config/
 _old/
+__pycache__/
+
 
 # Specific Files #
 ############
