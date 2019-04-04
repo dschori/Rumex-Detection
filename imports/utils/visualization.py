@@ -17,6 +17,11 @@ import skimage.measure
 import matplotlib.patches as patches
 from scipy.spatial import distance_matrix
 from skimage.draw import circle
+import cv2
+import imutils
+from skimage.feature import peak_local_max
+from skimage.morphology import watershed
+from scipy import ndimage
 
 from imports.utils.enums import DATA_BASE_PATH, SHAPE
 from imports.utils.log_progress import log_progress
@@ -286,6 +291,72 @@ class Evaluate(Visualize):
         elif mode == 'raw':
             return dice_coeffs
 
+    def get_root_pred_coord_v1(self,prediction,threshold=0.5):
+        prediction = prediction > threshold
+        labels = skimage.measure.label(prediction)
+        roots_pred = skimage.measure.regionprops(labels)
+        roots_pred = [r for r in roots_pred if r.area > 2000]
+        roots_pred = [r.centroid for r in roots_pred]
+        roots_pred = [list(p) for p in roots_pred] #Convert to same format
+        roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y
+        return roots_pred
+
+    def get_root_pred_coord_v2(self,prediction):
+        pred = (prediction*255).astype("uint8")
+        tmp = np.zeros((512,768,3),dtype="uint8")
+        tmp[:,:,0] = pred
+        tmp[:,:,1] = pred
+        tmp[:,:,2] = pred
+        pred = tmp
+
+        # load the image and perform pyramid mean shift filtering
+        # to aid the thresholding step
+        shifted = cv2.pyrMeanShiftFiltering(pred, 21, 51)
+        
+        # convert the mean shift image to grayscale, then apply
+        # Otsu's thresholding
+        gray = cv2.cvtColor(shifted, cv2.COLOR_BGR2GRAY)
+        thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
+
+        # compute the exact Euclidean distance from every binary
+        # pixel to the nearest zero pixel, then find peaks in this
+        # distance map
+        D = ndimage.distance_transform_edt(thresh)
+        localMax = peak_local_max(D, indices=False, min_distance=40, labels=thresh)
+        
+        # perform a connected component analysis on the local peaks,
+        # using 8-connectivity, then appy the Watershed algorithm
+        markers = ndimage.label(localMax, structure=np.ones((3, 3)))[0]
+        labels = watershed(-D, markers, mask=thresh)
+        #print("[INFO] {} unique segments found".format(len(np.unique(labels)) - 1))
+
+        roots_pred = []
+
+        for label in np.unique(labels):
+            # if the label is zero, we are examining the 'background'
+            # so simply ignore it
+            if label == 0:
+                continue
+        
+            # otherwise, allocate memory for the label region and draw
+            # it on the mask
+            mask = np.zeros(gray.shape, dtype="uint8")
+            mask[labels == label] = 255
+        
+            # detect contours in the mask and grab the largest one
+            cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+                cv2.CHAIN_APPROX_SIMPLE)
+            cnts = imutils.grab_contours(cnts)
+            c = max(cnts, key=cv2.contourArea)
+        
+            # draw a circle enclosing the object
+            ((x, y), r) = cv2.minEnclosingCircle(c)
+
+            roots_pred.append((x,y))
+
+        roots_pred = [list(p) for p in roots_pred]
+        return roots_pred
+
     def get_root_precicion(self,index,tolerance=60,print_distance_matrix=False):
         assert self.pred_layer == 2, "Wrong Prediction Layer"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
@@ -293,13 +364,7 @@ class Evaluate(Visualize):
         self.predict()
         roots_true = (list(self.selected_row["roots"].values/2)[0])
         roots_true = [list(list(t)) for t in roots_true] #Convert to same format
-        pred = self.prediction > 0.5
-        labels = skimage.measure.label(pred)
-        roots_pred = skimage.measure.regionprops(labels)
-        roots_pred = [r for r in roots_pred if r.area > 2000]
-        roots_pred = [r.centroid for r in roots_pred]
-        roots_pred = [list(p) for p in roots_pred] #Convert to same format
-        roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y
+        roots_pred = self.get_root_pred_coord_v2(self.prediction)
 
         if len(roots_pred) > 0 and len(roots_true) > 0:
             # if there are both roots in the image and we are also predict at least one:
