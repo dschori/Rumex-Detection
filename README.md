@@ -16,3 +16,4 @@ Required Packages:
 - matplotlib
 - cv2
 - segmentation-models
+- imutils
