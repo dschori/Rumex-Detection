@@ -1,6 +1,7 @@
 from keras.models import Model
 from keras.layers import Input, concatenate, MaxPooling2D,Conv2D, Activation, UpSampling2D, BatchNormalization
-from keras.optimizers import RMSprop, Adadelta
+from keras.optimizers import RMSprop, Adadelta, SGD
+from keras.applications.vgg19 import VGG19
 
 from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff, iou, iou_loss
 import numpy as np
@@ -249,3 +250,186 @@ def get_unet_mod(input_shape=(1024, 1024, 3),
     model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
     return model    
 
+
+def decoder_block(input,concat_layer,n_feature_maps):
+    up = UpSampling2D((2,2))(input)
+    up = concatenate([concat_layer,up],axis=3)
+    for _ in range(3):
+        up = Conv2D(n_feature_maps,(3,3),padding='same')(up)
+        up = BatchNormalization()(up)
+        up = Activation('relu')(up)
+    return up
+
+def encoder_block(input,n_feature_maps,names):
+    down = input
+    for n in names:
+        down = Conv2D(n_feature_maps, (3, 3), padding='same',name=n)(down)
+        #down = BatchNormalization()(down)
+        down = Activation('relu')(down)
+
+    concat_layer = down
+    down = MaxPooling2D((2, 2), strides=(2, 2))(down)
+    return down, concat_layer
+
+def get_unet_pretrained(encoder='vgg19',input_shape=(512, 768, 3)):
+    decoder_block_names = (
+        ['10','11'],
+        ['20','21'],
+        ['30','31','32','33'],
+        ['40','41','42','43'],
+        ['50','51','52','53'])
+    concats_list = []
+    input = Input(shape=input_shape)
+    origin = input
+    
+    down, concat_layer = encoder_block(input,64,decoder_block_names[0])
+    concats_list.append(concat_layer)
+    down, concat_layer = encoder_block(down,128,decoder_block_names[1])
+    concats_list.append(concat_layer)
+    down, concat_layer = encoder_block(down,256,decoder_block_names[2])
+    concats_list.append(concat_layer)
+    down, concat_layer = encoder_block(down,512,decoder_block_names[3])
+    concats_list.append(concat_layer)
+    down, concat_layer = encoder_block(down,512,decoder_block_names[4])
+    concats_list.append(concat_layer)
+
+    input = down
+    # upsampling:
+    for f,c in zip([512,256,128,64,32],concats_list[::-1]):
+        output = decoder_block(input,c,f)
+        input = output
+
+    final_layer = Conv2D(2, (3, 3), padding='same')(output)
+    final_layer = Activation("sigmoid")(final_layer)
+    model = Model(inputs=origin, outputs=final_layer)
+    model.compile(optimizer=SGD(lr=0.0001, momentum=0.95), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+
+    pretrained_layers = []
+    encoder_pretrained = VGG19(include_top=False,weights='imagenet',input_shape=input_shape)
+    pretrained_layers.append(encoder_pretrained.layers[1:3])
+    pretrained_layers.append(encoder_pretrained.layers[4:6])
+    pretrained_layers.append(encoder_pretrained.layers[7:11])
+    pretrained_layers.append(encoder_pretrained.layers[12:16])
+    pretrained_layers.append(encoder_pretrained.layers[17:21])
+
+    for b,block in enumerate(decoder_block_names):
+        for n,name in enumerate(block):
+            model.get_layer(name).set_weights(pretrained_layers[b][n].get_weights())
+
+    return model
+
+def unet_freeze_encoder(model):
+    decoder_block_names = (
+        ['10','11'],
+        ['20','21'],
+        ['30','31','32','33'],
+        ['40','41','42','43'],
+        ['50','51','52','53'])
+
+    for block in (decoder_block_names):
+        for name in (block):
+            model.get_layer(name).trainable = False
+
+    model.compile(optimizer=SGD(lr=0.0001, momentum=0.95), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+
+def unet_unfreeze_encoder(model):
+    decoder_block_names = (
+        ['10','11'],
+        ['20','21'],
+        ['30','31','32','33'],
+        ['40','41','42','43'],
+        ['50','51','52','53'])
+
+    for block in (decoder_block_names):
+        for name in (block):
+            model.get_layer(name).trainable = True
+
+    model.compile(optimizer=SGD(lr=0.0001, momentum=0.95), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+
+
+class UNet():
+    def __init__(self):
+        self.decoder_block_names = (
+            ['10','11'],
+            ['20','21'],
+            ['30','31','32','33'],
+            ['40','41','42','43'],
+            ['50','51','52','53'])
+        self.model = None
+
+    def get_model(self):
+        return self.model
+
+    def __compile_model(self):
+        self.model.compile(optimizer=SGD(lr=0.0001, momentum=0.95), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+
+    def unet_freeze_encoder(self):
+        for block in (self.decoder_block_names):
+            for name in (block):
+                self.model.get_layer(name).trainable = False
+        self.__compile_model
+
+    def unet_unfreeze_encoder(self):
+        for block in (self.decoder_block_names):
+            for name in (block):
+                self.model.get_layer(name).trainable = True
+        self.__compile_model
+
+    def decoder_block(self,input,concat_layer,n_feature_maps):
+        up = UpSampling2D((2,2))(input)
+        up = concatenate([concat_layer,up],axis=3)
+        for _ in range(3):
+            up = Conv2D(n_feature_maps,(3,3),padding='same')(up)
+            up = BatchNormalization()(up)
+            up = Activation('relu')(up)
+        return up
+
+    def encoder_block(self,input,n_feature_maps,names):
+        down = input
+        for n in names:
+            down = Conv2D(n_feature_maps, (3, 3), padding='same',name=n)(down)
+            #down = BatchNormalization()(down)
+            down = Activation('relu')(down)
+
+        concat_layer = down
+        down = MaxPooling2D((2, 2), strides=(2, 2))(down)
+        return down, concat_layer
+
+    def create_unet_pretrained(self,encoder='vgg19',input_shape=(512, 768, 3)):
+        concats_list = []
+        input = Input(shape=input_shape)
+        origin = input
+        
+        down, concat_layer = self.encoder_block(input,64,self.decoder_block_names[0])
+        concats_list.append(concat_layer)
+        down, concat_layer = self.encoder_block(down,128,self.decoder_block_names[1])
+        concats_list.append(concat_layer)
+        down, concat_layer = self.encoder_block(down,256,self.decoder_block_names[2])
+        concats_list.append(concat_layer)
+        down, concat_layer = self.encoder_block(down,512,self.decoder_block_names[3])
+        concats_list.append(concat_layer)
+        down, concat_layer = self.encoder_block(down,512,self.decoder_block_names[4])
+        concats_list.append(concat_layer)
+
+        input = down
+        # upsampling:
+        for f,c in zip([512,256,128,64,32],concats_list[::-1]):
+            output = self.decoder_block(input,c,f)
+            input = output
+
+        final_layer = Conv2D(2, (3, 3), padding='same')(output)
+        final_layer = Activation("sigmoid")(final_layer)
+        self.model = Model(inputs=origin, outputs=final_layer)
+        self.__compile_model()
+
+        pretrained_layers = []
+        encoder_pretrained = VGG19(include_top=False,weights='imagenet',input_shape=input_shape)
+        pretrained_layers.append(encoder_pretrained.layers[1:3])
+        pretrained_layers.append(encoder_pretrained.layers[4:6])
+        pretrained_layers.append(encoder_pretrained.layers[7:11])
+        pretrained_layers.append(encoder_pretrained.layers[12:16])
+        pretrained_layers.append(encoder_pretrained.layers[17:21])
+
+        for b,block in enumerate(self.decoder_block_names):
+            for n,name in enumerate(block):
+                self.model.get_layer(name).set_weights(pretrained_layers[b][n].get_weights())
