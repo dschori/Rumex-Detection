@@ -2,6 +2,7 @@ from keras.models import Model
 from keras.layers import Input, concatenate, MaxPooling2D,Conv2D, Activation, UpSampling2D, BatchNormalization
 from keras.optimizers import RMSprop, Adadelta, SGD
 from keras.applications.vgg19 import VGG19
+from imports.models.coord import CoordinateChannel2D
 
 from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff, iou, iou_loss
 import numpy as np
@@ -307,6 +308,8 @@ class UNet():
         concats_list = []
         input = Input(shape=input_shape)
         origin = input
+        input = CoordinateChannel2D()(input)
+
         
         down, concat_layer = self.encoder_block(input,64,self.decoder_block_names[0])
         concats_list.append(concat_layer)
@@ -341,4 +344,9 @@ class UNet():
 
             for b,block in enumerate(self.decoder_block_names):
                 for n,name in enumerate(block):
-                    self.model.get_layer(name).set_weights(pretrained_layers[b][n].get_weights())
+                    if name == 'd10':
+                        tmp_weights = self.model.get_layer(name).get_weights()
+                        tmp_weights[0][:,:,0:3,:] = pretrained_layers[b][n].get_weights()[0]
+                        self.model.get_layer(name).set_weights(tmp_weights)
+                    else:
+                        self.model.get_layer(name).set_weights(pretrained_layers[b][n].get_weights())
