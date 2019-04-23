@@ -89,7 +89,8 @@ class DataGenerator(keras.utils.Sequence):
         for _, row in tmp_df.iterrows():
             img = imread(row['image_path']+row['name'])
             msk = imread(row['mask_path']+row['name'])
-            msk_circle = imread(row['mask_cirlce_path']+row['name'])
+            #msk_circle = imread(row['mask_cirlce_path']+row['name'])
+            msk_circle = imread('../data/00_all/masks_matlab/'+row['name'])
             
             img = resize(img,self.target_size)
             msk = resize(msk,self.target_size)

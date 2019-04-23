@@ -308,7 +308,7 @@ class UNet():
         concats_list = []
         input = Input(shape=input_shape)
         origin = input
-        input = CoordinateChannel2D()(input)
+        #input = CoordinateChannel2D()(input)
 
         
         down, concat_layer = self.encoder_block(input,64,self.decoder_block_names[0])
@@ -323,8 +323,9 @@ class UNet():
         concats_list.append(concat_layer)
 
         input = down
+
         # upsampling:
-        for f,c in zip([512,256,128,64,32],concats_list[::-1]):
+        for f,c in zip([512,512,256,128,64],concats_list[::-1]):
             output = self.decoder_block(input,c,f)
             input = output
 
@@ -333,7 +334,7 @@ class UNet():
         self.model = Model(inputs=origin, outputs=final_layer)
         self.__compile_model()
 
-        if encoder_type == 'vgg19':
+        if encoder_type == 'vgg1':
             pretrained_layers = []
             encoder_pretrained = VGG19(include_top=False,weights='imagenet',input_shape=input_shape)
             pretrained_layers.append(encoder_pretrained.layers[1:3])
