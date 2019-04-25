@@ -32,6 +32,41 @@ def weight_map(y_true,wc=None,w0=1,sigma=12):
         w = np.zeros_like(y)
     return w
 
+def iou_score(y_true, y_pred, class_weights=1., smooth=1e-12, per_image=True):
+    #https://github.com/qubvel/segmentation_models/blob/master/segmentation_models/metrics.py
+    r""" The `Jaccard index`_, also known as Intersection over Union and the Jaccard similarity coefficient
+    (originally coined coefficient de communauté by Paul Jaccard), is a statistic used for comparing the
+    similarity and diversity of sample sets. The Jaccard coefficient measures similarity between finite sample sets,
+    and is defined as the size of the intersection divided by the size of the union of the sample sets:
+    .. math:: J(A, B) = \frac{A \cap B}{A \cup B}
+    Args:
+        gt: ground truth 4D keras tensor (B, H, W, C)
+        pr: prediction 4D keras tensor (B, H, W, C)
+        class_weights: 1. or list of class weights, len(weights) = C
+        smooth: value to avoid division by zero
+        per_image: if ``True``, metric is calculated as mean over images in batch (B),
+            else over whole batch
+    Returns:
+        IoU/Jaccard score in range [0, 1]
+    .. _`Jaccard index`: https://en.wikipedia.org/wiki/Jaccard_index
+    """
+    if per_image:
+        axes = [1, 2]
+    else:
+        axes = [0, 1, 2]
+
+    intersection = K.sum(y_true * y_pred, axis=axes)
+    union = K.sum(y_true + y_pred, axis=axes) - intersection
+    iou = (intersection + smooth) / (union + smooth)
+
+    # mean per image
+    if per_image:
+        iou = K.mean(iou, axis=0)
+
+    # weighted mean per class
+    iou = K.mean(iou * class_weights)
+
+    return iou
 
 def iou(y_true,y_pred,smooth=1):
     intersection = K.sum(K.abs(y_true * y_pred), axis=-1)
