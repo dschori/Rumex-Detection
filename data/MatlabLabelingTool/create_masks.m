@@ -1,6 +1,6 @@
 clear all
 
-load('matlab_labeling.mat')
+load('matlab_labeling2.mat')
 
 for e = 1:507
     msk = zeros(1024,1536);
@@ -20,7 +20,7 @@ for e = 1:507
     end
     msk = msk>0;
     [filepath,name,ext] = fileparts(msks.imageFilename{e});
-    path = strcat('D:/10_GitHub/Agroscope/data/00_all/masks_matlab/',name,'.png');
+    path = strcat('C:/Users/dschori/Documents/01_git/Agroscope/data/00_all/masks_matlab2/',name,'.png');
     imwrite(msk,path);
     e
 end
