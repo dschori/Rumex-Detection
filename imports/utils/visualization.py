@@ -156,7 +156,7 @@ class Visualize():
                     height = b[2] - b[0]
                     rect = patches.Rectangle((b[1],b[0]),width,height,
                                             linewidth=4,edgecolor='b',facecolor='None')
-                    circ = patches.Circle(c[::-1],10,facecolor='red')
+                    circ = patches.Circle(c[::-1],30,facecolor='red')
                     ax.add_patch(rect)
                     ax.add_patch(circ)
                 for root_y in self.selected_row["roots"].values[0]/2:
@@ -165,7 +165,7 @@ class Visualize():
                     ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
             ax.imshow(self.msk, alpha=0.4)
-        if self.mode == 'image_prediction_contour':
+        if self.mode == 'image_prediction_  contour':
             self.predict()
             ax.imshow(self.img,cmap='gray')
             CS = ax.contour(self.msk,[-1,1],colors='cyan',linewidths=2)
@@ -365,6 +365,56 @@ class Evaluate(Visualize):
 
         roots_pred = [list(p) for p in roots_pred]
         return roots_pred
+    
+    def get_root_precicion_v2(self,index,tolerance=60,print_distance_matrix=False):
+        assert self.pred_layer == 2, "Wrong Prediction Layer"
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        self.load_data()
+        self.predict()
+        roots_true = (list(self.selected_row["roots"].values/2)[0])
+        roots_true = [list(list(t)) for t in roots_true] #Convert to same format
+        roots_pred = self.get_root_pred_coord_v1(self.prediction)
+
+        if len(roots_pred) > 0 and len(roots_true) > 0:
+            # if there are both roots in the image and we are also predict at least one:
+            ds = distance_matrix(roots_true, roots_pred)
+            # axis0 = number ground truth
+            # axis1 = number predictions
+            if print_distance_matrix == True:
+                print(ds)
+
+            tP = sum(ds.min(axis=0)<=tolerance)
+            fN = sum(ds.min(axis=1)>tolerance)
+            fP = ds.shape[1]-tP
+
+            precision = tP / (tP+fP)
+            recall = tP / (tP+fN)
+
+        elif len(roots_true) == 0 and len(roots_pred) > 0:
+            # If there are no roots in image but we predict some:
+            tP = 0
+            fN = 0
+            fP = len(roots_pred)
+            precision = 0.0
+            recall = 0.0
+
+        elif len(roots_true) > 0 and len(roots_pred) == 0:
+            # If there are roots in the image but we predict none:
+            tP = 0
+            fN = len(roots_pred)
+            fP = 0
+            precision = 0.0
+            recall = 0.0
+
+        else:
+            # If there are neither roots in the image and prediction:
+            tP = 0
+            fN = 0
+            fP = 0
+            precision = 1.0
+            recall = 1.0
+        
+        return tP, fP, fN, precision, recall
 
     def get_root_precicion(self,index,tolerance=60,print_distance_matrix=False):
         assert self.pred_layer == 2, "Wrong Prediction Layer"
@@ -378,14 +428,15 @@ class Evaluate(Visualize):
         if len(roots_pred) > 0 and len(roots_true) > 0:
             # if there are both roots in the image and we are also predict at least one:
             ds = distance_matrix(roots_true, roots_pred)
-
+            # axis0 = number ground truth
+            # axis1 = number predictions
             if print_distance_matrix == True:
                 print(ds)
 
             all_errors = sum(ds.min(axis=1)>tolerance)
             tP = sum(ds.min(axis=1)<=tolerance)
             combined = 0
-
+            print(tP)
             if tP > ds.shape[1]:
                 combined = abs(tP-ds.shape[1])
                 tP -= combined
@@ -397,7 +448,7 @@ class Evaluate(Visualize):
             else:
                 fP = 0
                 fN = 0
-            
+
             precision = tP / (tP+fP)
             recall = tP / (tP+fN)
 
@@ -431,7 +482,7 @@ class Evaluate(Visualize):
         for rr in range_roots_per_image:
             for _ , row in df.iterrows():
                 if len(row['roots']) >= rr:
-                    tP, fP, fN, precicion, recall = self.get_root_precicion(row["name"])
+                    tP, fP, fN, precicion, recall = self.get_root_precicion_v2(row["name"])
 
 
     def get_false_negative_mask(self,index):
