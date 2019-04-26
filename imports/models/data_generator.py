@@ -37,9 +37,8 @@ class DataGenerator(keras.utils.Sequence):
         self.save_index = 0
         self.__init_info()
         self.on_epoch_end()
-        self.preprocess_input = get_preprocessing("resnet50")
         self.seq = iaa.Sequential([
-            iaa.SomeOf((1, 5), [
+            iaa.SomeOf((1, 4), [
                 iaa.OneOf([
                     iaa.GaussianBlur(sigma=(0, 0.5)),
                     iaa.Sharpen(alpha=(0.0, 0.7)),

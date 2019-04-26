@@ -156,15 +156,19 @@ class Visualize():
                     height = b[2] - b[0]
                     rect = patches.Rectangle((b[1],b[0]),width,height,
                                             linewidth=4,edgecolor='b',facecolor='None')
-                    circ = patches.Circle(c[::-1],30,facecolor='red')
-                    ax.add_patch(rect)
+                    circ = patches.Circle(c[::-1],30,facecolor='red',alpha=0.5)
+                    circ2 = patches.Circle(c[::-1],4,facecolor='black')
+                    #ax.add_patch(rect)
                     ax.add_patch(circ)
-                for root_y in self.selected_row["roots"].values[0]/2:
-                   # print(root_y)
-                    circ = patches.Circle(tuple(root_y),5,facecolor='yellow')
-                    ax.add_patch(circ)
+                    ax.add_patch(circ2)
+                if "roots" in self.selected_row:
+                    for root_y in self.selected_row["roots"].values[0]/2:
+                    # print(root_y)
+                        circ = patches.Circle(tuple(root_y),5,facecolor='yellow')
+                        ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
-            ax.imshow(self.msk, alpha=0.4)
+            if "roots" in self.selected_row:
+                ax.imshow(self.msk, alpha=0.4)
         if self.mode == 'image_prediction_  contour':
             self.predict()
             ax.imshow(self.img,cmap='gray')
@@ -436,7 +440,7 @@ class Evaluate(Visualize):
             all_errors = sum(ds.min(axis=1)>tolerance)
             tP = sum(ds.min(axis=1)<=tolerance)
             combined = 0
-            print(tP)
+            #print(tP)
             if tP > ds.shape[1]:
                 combined = abs(tP-ds.shape[1])
                 tP -= combined

@@ -4,7 +4,7 @@ from keras.optimizers import RMSprop, Adadelta, SGD
 from keras.applications.vgg19 import VGG19
 from imports.models.coord import CoordinateChannel2D
 
-from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff, iou, iou_loss
+from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff, iou, iou_loss, iou_score
 import numpy as np
 
 ## Simple UNet:
@@ -225,6 +225,7 @@ def get_unet_mod(input_shape=(1024, 1024, 3),
     concats_list = []
     input = Input(shape=input_shape)
     origin = input
+    input = CoordinateChannel2D()(input)
     
     # downsampling:
     for f in feature_maps:
@@ -248,7 +249,7 @@ def get_unet_mod(input_shape=(1024, 1024, 3),
     final_layer = Conv2D(num_classes, (3, 3), padding='same')(output)
     final_layer = Activation("sigmoid")(final_layer)
     model = Model(inputs=origin, outputs=final_layer)
-    model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+    model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou_score])
     return model    
 
 
@@ -267,15 +268,17 @@ class UNet():
         return self.model
 
     def __compile_model(self):
-        self.model.compile(optimizer=SGD(lr=0.0001, momentum=0.95), loss=bce_dice_loss, metrics=[dice_coeff,iou])
+        self.model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou_score])
 
-    def freeze_encoder(self):
+    def freeze_encoder(self,model):
+        self.model = model
         for block in (self.decoder_block_names):
             for name in (block):
                 self.model.get_layer(name).trainable = False
         self.__compile_model()
 
-    def unfreeze_encoder(self):
+    def unfreeze_encoder(self,model):
+        self.model = model
         for block in (self.decoder_block_names):
             for name in (block):
                 self.model.get_layer(name).trainable = True
@@ -285,30 +288,28 @@ class UNet():
         up = UpSampling2D((2,2))(input)
         up = concatenate([concat_layer,up],axis=3)
         for _ in range(3):
-            up = Conv2D(n_feature_maps,(3,3),padding='same')(up)
-            if self.batchnorm == True:
-                up = BatchNormalization()(up)
-            up = Activation('relu')(up)
+            up = Conv2D(n_feature_maps,(3,3),padding='same', activation='relu')(up)
+            up = BatchNormalization()(up)
+            #up = Activation('relu')(up)
         return up
 
     def encoder_block(self,input,n_feature_maps,names):
         down = input
         for n in names:
-            down = Conv2D(n_feature_maps, (3, 3), padding='same',name=n)(down)
-            if self.batchnorm == True:
-                down = BatchNormalization()(down)
-            down = Activation('relu')(down)
+            down = Conv2D(n_feature_maps, (3, 3), padding='same', activation='relu',name=n)(down)
+            down = BatchNormalization()(down) if self.batchnorm == True else down
+            #down = Activation('relu')(down)
 
         concat_layer = down
         down = MaxPooling2D((2, 2), strides=(2, 2))(down)
         return down, concat_layer
 
-    def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,input_shape=(512, 768, 3)):
+    def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,coord_conv=True,input_shape=(512, 768, 3)):
         self.batchnorm = batchnorm
         concats_list = []
         input = Input(shape=input_shape)
         origin = input
-        #input = CoordinateChannel2D()(input)
+        input = CoordinateChannel2D()(input) if coord_conv == True else input
 
         
         down, concat_layer = self.encoder_block(input,64,self.decoder_block_names[0])
@@ -322,10 +323,16 @@ class UNet():
         down, concat_layer = self.encoder_block(down,512,self.decoder_block_names[4])
         concats_list.append(concat_layer)
 
-        input = down
+        center = down
+        for _ in range(1):
+            center = Conv2D(512, (3, 3), padding='same', activation='relu')(center)
+            center = BatchNormalization()(center)
+            #center = Activation('relu')(center)
+
+        input = center
 
         # upsampling:
-        for f,c in zip([512,512,256,128,64],concats_list[::-1]):
+        for f,c in zip([256,128,64,32,16],concats_list[::-1]):
             output = self.decoder_block(input,c,f)
             input = output
 
@@ -334,7 +341,7 @@ class UNet():
         self.model = Model(inputs=origin, outputs=final_layer)
         self.__compile_model()
 
-        if encoder_type == 'vgg1':
+        if encoder_type == 'vgg19':
             pretrained_layers = []
             encoder_pretrained = VGG19(include_top=False,weights='imagenet',input_shape=input_shape)
             pretrained_layers.append(encoder_pretrained.layers[1:3])
