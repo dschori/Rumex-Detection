@@ -25,6 +25,7 @@ __pycache__/
 # Specific Files #
 ############
 *.h5 
+*.pyc
 
 # Packages #
 ############

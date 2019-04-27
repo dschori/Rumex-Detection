@@ -169,7 +169,7 @@ class Visualize():
             ax.imshow(self.img,cmap='gray')
             if "roots" in self.selected_row:
                 ax.imshow(self.msk, alpha=0.4)
-        if self.mode == 'image_prediction_  contour':
+        if self.mode == 'image_prediction_contour':
             self.predict()
             ax.imshow(self.img,cmap='gray')
             CS = ax.contour(self.msk,[-1,1],colors='cyan',linewidths=2)
