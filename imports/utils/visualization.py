@@ -71,8 +71,7 @@ class Visualize():
         if index == 'random':
             raise ValueError('Random not supported here!')
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        for r in self.selected_row["roots"].values[0]:
-            pass
+        return [tuple(r) for r in self.selected_row["roots"].values[0]]
             
     def get_prediction(self,index):
         if index == 'random':
@@ -149,16 +148,11 @@ class Visualize():
             ax.imshow(self.error,cmap='Reds', alpha=0.4, interpolation='none')
         if self.mode == "image_prediction_roots":
             self.predict()
-            root_coords, root_bbox = self.predict_roots()
+            root_coords = Evaluate.get_root_pred_coord_v1(self,self.prediction)
             if root_coords is not None:
-                for c,b in zip(root_coords,root_bbox):
-                    width = b[3] - b[1]
-                    height = b[2] - b[0]
-                    rect = patches.Rectangle((b[1],b[0]),width,height,
-                                            linewidth=4,edgecolor='b',facecolor='None')
-                    circ = patches.Circle(c[::-1],30,facecolor='red',alpha=0.5)
-                    circ2 = patches.Circle(c[::-1],4,facecolor='black')
-                    #ax.add_patch(rect)
+                for c in root_coords:
+                    circ = patches.Circle(c,30,facecolor='red',alpha=0.5)
+                    circ2 = patches.Circle(c,4,facecolor='black')
                     ax.add_patch(circ)
                     ax.add_patch(circ2)
                 if "roots" in self.selected_row:
@@ -167,12 +161,12 @@ class Visualize():
                         circ = patches.Circle(tuple(root_y),5,facecolor='yellow')
                         ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
-            if "roots" in self.selected_row:
-                ax.imshow(self.msk, alpha=0.4)
+            #if "roots" in self.selected_row:
+                #ax.imshow(self.msk, alpha=0.4)
         if self.mode == 'image_prediction_contour':
             self.predict()
             ax.imshow(self.img,cmap='gray')
-            CS = ax.contour(self.msk,[-1,1],colors='cyan',linewidths=2)
+            CS = ax.contour(self.msk,[-1,1],colors='cyan',linewidths=3)
             if self.prediction_threshold == None:
                 ax.imshow(self.prediction, alpha=0.4)
             else:
@@ -201,27 +195,15 @@ class Visualize():
         self.img = img_as_float(self.img)
 
         if 'mask_path' in self.df:
-            if self.masktype == 'hand':
+            if self.pred_layer == 1:
                 msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
-            elif self.masktype == 'auto':
-                msk = imread(self.selected_row.mask_cirlce_path.values[0]+self.selected_row.name.values[0])[:,:,0]
+            elif self.pred_layer == 2:
+                msk = imread('../data/00_all/masks_matlab2/'+self.selected_row['name'].values[0])
             
             self.msk = resize(msk,self.input_shape[:2]).reshape(*self.input_shape[:2])
             self.msk = img_as_float(self.msk)
         else:
             self.msk = np.zeros(self.input_shape[:2])
-
-    def predict_roots(self):
-        pred = self.prediction > 0.5
-        labels = skimage.measure.label(pred)
-        roots = skimage.measure.regionprops(labels)
-        roots = [r for r in roots if r.area > 2000]
-        if len(roots) == 0:
-            return None, None
-        else:
-            root_coords = [r.centroid for r in roots]
-            root_bbox = [r.bbox for r in roots]
-            return root_coords, root_bbox
         
     def predict(self):
         if self.model.layers[0].input_shape[1:] != self.input_shape:
@@ -256,7 +238,6 @@ class Visualize():
 
     # https://www.kaggle.com/gauss256/preprocess-images
 
-
     def __adjust_data(self,img):
         if self.input_shape[2] == 1: #grayscale
             img = rgb2gray(img)
@@ -282,10 +263,8 @@ class Evaluate(Visualize):
             iaa.CLAHE(),
             iaa.LinearContrast(alpha=1.0)
         ])
-        #self.dice_score = None
 
-
-    def get_dice_coeff(self,mode='simple'):
+    def get_dice_coeff_score(self,mode='simple'):
         assert mode=='simple' or mode=='raw', 'Mode must be "simple" or "raw"'
         dice_coeffs = []
         prediction_times = [] # Just for stats
@@ -295,7 +274,7 @@ class Evaluate(Visualize):
             t = time.time()
             self.predict()
             prediction_times.append(time.time() - t)
-            dice_coeffs.append(self.dice_score)
+            dice_coeffs.append(self.__dice_score(self.prediction.reshape(1,*self.input_shape[:2],1),self.msk.reshape(1,*self.input_shape[:2],1)))
 
         print("Average prediction time: %.2f s" % (sum(prediction_times)/len(prediction_times)))
         if mode=='simple':
@@ -303,11 +282,43 @@ class Evaluate(Visualize):
         elif mode == 'raw':
             return dice_coeffs
 
+    def get_iou_score(self,mode='simple'):
+        iou_scores = []
+        for i in log_progress(range(len(self.df)),name='Samples to Test'):
+            self.selected_row = self.df.iloc[[i]]
+            self.load_data()
+            self.predict()
+            iou_scores.append(self.__iou_score(self.prediction.reshape(1,*self.input_shape[:2],1),self.msk.reshape(1,*self.input_shape[:2],1)))
+        if mode=='simple':
+            return min(iou_scores), max(iou_scores), sum(iou_scores)/len(iou_scores)
+        elif mode == 'raw':
+            return iou_scores
+
+    def __dice_score(self,y_true,y_pred,smooth=1e-12):
+        y_true_f = np.ndarray.flatten(y_true)
+        y_pred_f = np.ndarray.flatten(y_pred)
+        intersection = np.sum(y_true_f * y_pred_f)
+        score = (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+        return score #Scalar
+    
+    def __iou_score(self,y_true, y_pred, smooth=1e-12):
+        #https://github.com/qubvel/segmentation_models/blob/master/segmentation_models/metrics.py
+        axes = (1, 2)
+
+        intersection = np.sum(y_true * y_pred, axis=axes)
+        union = np.sum(y_true + y_pred, axis=axes) - intersection
+        iou = (intersection + smooth) / (union + smooth)
+
+        # mean per image
+        iou = np.mean(iou, axis=0)
+
+        return iou
+
     def get_root_pred_coord_v1(self,prediction,threshold=0.5):
         prediction = prediction > threshold
         labels = skimage.measure.label(prediction)
         roots_pred = skimage.measure.regionprops(labels)
-        roots_pred = [r for r in roots_pred if r.area > 2000]
+        roots_pred = [r for r in roots_pred if r.area > 200]
         roots_pred = [r.centroid for r in roots_pred]
         roots_pred = [list(p) for p in roots_pred] #Convert to same format
         roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y
@@ -335,7 +346,7 @@ class Evaluate(Visualize):
         # pixel to the nearest zero pixel, then find peaks in this
         # distance map
         D = ndimage.distance_transform_edt(thresh)
-        localMax = peak_local_max(D, indices=False, min_distance=40, labels=thresh)
+        localMax = peak_local_max(D, indices=False, min_distance=20, labels=thresh)
         
         # perform a connected component analysis on the local peaks,
         # using 8-connectivity, then appy the Watershed algorithm
@@ -350,11 +361,14 @@ class Evaluate(Visualize):
             # so simply ignore it
             if label == 0:
                 continue
-        
             # otherwise, allocate memory for the label region and draw
             # it on the mask
             mask = np.zeros(gray.shape, dtype="uint8")
             mask[labels == label] = 255
+            if np.sum(mask[labels == label]) < 300000:
+                continue
+            
+            #print(np.sum(mask[labels == label]))
         
             # detect contours in the mask and grab the largest one
             cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
@@ -369,7 +383,7 @@ class Evaluate(Visualize):
 
         roots_pred = [list(p) for p in roots_pred]
         return roots_pred
-    
+        
     def get_root_precicion_v2(self,index,tolerance=60,print_distance_matrix=False):
         assert self.pred_layer == 2, "Wrong Prediction Layer"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
@@ -515,9 +529,3 @@ class Evaluate(Visualize):
         self.predict()
         error = np.abs((self.prediction-self.msk))
         return error
-            
-    def __find_roots(self):
-        pass
-
-    def __eval_circle_model(self):
-        pass
