@@ -392,7 +392,7 @@ class Evaluate(Visualize):
         roots_true = (list(self.selected_row["roots"].values/2)[0])
         roots_true = [list(list(t)) for t in roots_true] #Convert to same format
         roots_pred = self.get_root_pred_coord_v1(self.prediction)
-
+        
         if len(roots_pred) > 0 and len(roots_true) > 0:
             # if there are both roots in the image and we are also predict at least one:
             ds = distance_matrix(roots_true, roots_pred)
@@ -419,7 +419,7 @@ class Evaluate(Visualize):
         elif len(roots_true) > 0 and len(roots_pred) == 0:
             # If there are roots in the image but we predict none:
             tP = 0
-            fN = len(roots_pred)
+            fN = len(roots_true)
             fP = 0
             precision = 0.0
             recall = 0.0

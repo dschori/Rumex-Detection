@@ -75,7 +75,7 @@ def iou(y_true,y_pred,smooth=1):
     return iou
 
 def iou_loss(y_true,y_pred):
-    return -iou(y_true,y_pred)
+    return -iou_score(y_true,y_pred)
 
 def dice_coeff(y_true, y_pred):
     smooth = 1.
