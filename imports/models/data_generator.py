@@ -35,6 +35,7 @@ class DataGenerator(keras.utils.Sequence):
         self.save_images = save_images
         self.input_channels = input_channels
         self.save_index = 0
+        self.mask_channels = 1
         self.__init_info()
         self.on_epoch_end()
         self.seq = iaa.Sequential([
@@ -82,14 +83,14 @@ class DataGenerator(keras.utils.Sequence):
         'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
         # Initialization
         imgs = np.empty((self.batch_size, *self.target_size, self.input_channels),dtype=float)
-        masks = np.empty((self.batch_size, *self.target_size, 2))
+        masks = np.empty((self.batch_size, *self.target_size, 1+self.mask_channels))
         # Generate data
         ind = 0
         for _, row in tmp_df.iterrows():
             img = imread(row['image_path']+row['name'])
             msk = imread(row['mask_path']+row['name'])
             #msk_circle = imread(row['mask_cirlce_path']+row['name'])
-            msk_circle = imread('../data/00_all/masks_matlab3/'+row['name'])
+            msk_circle = imread('../data/00_all/masks_matlab5/'+row['name'])
             
             img = resize(img,self.target_size)
             msk = resize(msk,self.target_size)
@@ -108,7 +109,7 @@ class DataGenerator(keras.utils.Sequence):
 
             imgs[ind,] = img
             masks[ind,:,:,0] = msk
-            masks[ind,:,:,1] = msk_circle
+            masks[ind,:,:,1:1+self.mask_channels] = msk_circle
             ind += 1
 
         #return imgs, masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1)
@@ -127,8 +128,8 @@ class DataGenerator(keras.utils.Sequence):
         img_aug = seq_det.augment_image(img_aug)
         msk_aug = seq_det.augment_image(msk.reshape(*self.target_size,1))
         msk_aug = msk_aug.reshape(*self.target_size)
-        msk_circle_aug = seq_det.augment_image(msk_circle.reshape(*self.target_size,1))
-        msk_circle_aug = msk_circle_aug.reshape(*self.target_size)
+        msk_circle_aug = seq_det.augment_image(msk_circle.reshape(*self.target_size,self.mask_channels))
+        msk_circle_aug = msk_circle_aug.reshape(*self.target_size,self.mask_channels)
 
         img_aug = img_aug.astype(float)/255.0
         msk_aug = msk_aug.astype(float)/255.0

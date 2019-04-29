@@ -363,7 +363,7 @@ class UNet():
             output = self.decoder_block(input,c,f)
             input = output
 
-        final_layer = Conv2D(2, (3, 3), padding='same')(output)
+        final_layer = Conv2D(4, (3, 3), padding='same')(output)
         final_layer = Activation("sigmoid")(final_layer)
         self.model = Model(inputs=origin, outputs=final_layer)
         self.__compile_model()

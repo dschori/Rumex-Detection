@@ -20,7 +20,9 @@ for e = 1:507
     end
     msk = msk>0;
     [filepath,name,ext] = fileparts(msks.imageFilename{e});
-    path = strcat('C:/Users/dschori/Documents/01_git/Agroscope/data/00_all/masks_matlab2/',name,'.png');
+    
+    path = strcat('D:/10_GitHub/Agroscope/data/00_all/masks_matlab4/',name,'.png');
+    %path = strcat('C:/Users/dschori/Documents/01_git/Agroscope/data/00_all/masks_matlab2/',name,'.png');
     imwrite(msk,path);
     e
 end
