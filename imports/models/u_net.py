@@ -253,7 +253,6 @@ def get_unet_mod(input_shape=(1024, 1024, 3),
     model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou_score])
     return model    
 
-
 class UNet():
     def __init__(self):
         self.decoder_block_names = (
@@ -292,7 +291,7 @@ class UNet():
                 self.model.get_layer(name).trainable = True
         self.__compile_model()
 
-    def decoder_block(self,input,concat_layer,n_feature_maps):
+    def __decoder_block(self,input,concat_layer,n_feature_maps):
         up = UpSampling2D((2,2))(input)
         up = concatenate([concat_layer,up],axis=3)
         for _ in range(3):
@@ -301,7 +300,7 @@ class UNet():
             #up = Activation('relu')(up)
         return up
 
-    def encoder_block(self,input,n_feature_maps,names):
+    def __encoder_block(self,input,n_feature_maps,names):
         down = input
         for n in names:
             down = Conv2D(n_feature_maps, (3, 3), padding='same', activation='relu',name=n)(down)
@@ -312,6 +311,37 @@ class UNet():
         down = MaxPooling2D((2, 2), strides=(2, 2))(down)
         return down, concat_layer
 
+    def create_model(self,batch_norm=True,input_shape=(512,768,3),feature_maps=[16,32,64,128,256,512],num_classes=2):
+        self.batchnorm = batch_norm
+        concats_list = []
+        input = Input(shape=input_shape)
+        origin = input
+        
+        # downsampling:
+        for f in feature_maps:
+            output, concat_layer = self.__encoder_block(input,f,(str(f)+"a",str(f)+"b"))
+            input = output
+            concats_list.append(concat_layer)
+
+        # center
+        center = input 
+        for _ in range(2):
+            center = Conv2D(feature_maps[-1]*2, (3, 3), padding='same')(center)
+            center = BatchNormalization()(center)
+            center = Activation('relu')(center)
+
+        input = center
+        # upsampling:
+        for f,c in zip(feature_maps[::-1],concats_list[::-1]):
+            output = up_block(input,c,f)
+            input = output
+
+        final_layer = Conv2D(num_classes, (3, 3), padding='same')(output)
+        final_layer = Activation("sigmoid")(final_layer)
+        self.model = Model(inputs=origin, outputs=final_layer)
+        self.__compile_model
+
+
     def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,coord_conv=True,input_shape=(512, 768, 3)):
         self.encoder_type = encoder_type
         self.batchnorm = batchnorm
@@ -320,16 +350,23 @@ class UNet():
         origin = input
         input = CoordinateChannel2D()(input) if coord_conv == True else input
 
+        if encoder_type == "inception_v3":
+            base_model = InceptionV3(weights="imagenet",include_top=False)
+            concats_list.append(base_model.get_layer("activation_99")) #(None, 124, 188, 192
+            concats_list.append(base_model.get_layer("mixed2")) #(None, 61, 93, 288)
+            concats_list.append(base_model.get_layer("mixed7")) #(None, 30, 46, 768)
+            concats_list.append(base_model.get_layer("mixed10")) #(None, 14, 22, 1280)
+
         if encoder_type == "vgg19":
-            down, concat_layer = self.encoder_block(input,64,self.decoder_block_names[0])
+            down, concat_layer = self.__encoder_block(input,64,self.decoder_block_names[0])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,128,self.decoder_block_names[1])
+            down, concat_layer = self.__encoder_block(down,128,self.decoder_block_names[1])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,256,self.decoder_block_names[2])
+            down, concat_layer = self.__encoder_block(down,256,self.decoder_block_names[2])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,512,self.decoder_block_names[3])
+            down, concat_layer = self.__encoder_block(down,512,self.decoder_block_names[3])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,512,self.decoder_block_names[4])
+            down, concat_layer = self.__encoder_block(down,512,self.decoder_block_names[4])
             concats_list.append(concat_layer)
 
             center = down
@@ -339,15 +376,15 @@ class UNet():
                 #center = Activation('relu')(center)
 
         if encoder_type == "vgg16":
-            down, concat_layer = self.encoder_block(input,64,self.decoder_block_names_vgg16[0])
+            down, concat_layer = self.__encoder_block(input,64,self.decoder_block_names_vgg16[0])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,128,self.decoder_block_names_vgg16[1])
+            down, concat_layer = self.__encoder_block(down,128,self.decoder_block_names_vgg16[1])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,256,self.decoder_block_names_vgg16[2])
+            down, concat_layer = self.__encoder_block(down,256,self.decoder_block_names_vgg16[2])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,512,self.decoder_block_names_vgg16[3])
+            down, concat_layer = self.__encoder_block(down,512,self.decoder_block_names_vgg16[3])
             concats_list.append(concat_layer)
-            down, concat_layer = self.encoder_block(down,512,self.decoder_block_names_vgg16[4])
+            down, concat_layer = self.__encoder_block(down,512,self.decoder_block_names_vgg16[4])
             concats_list.append(concat_layer)
 
             center = down
@@ -360,7 +397,7 @@ class UNet():
 
         # upsampling:
         for f,c in zip([512,256,128,64,32],concats_list[::-1]):
-            output = self.decoder_block(input,c,f)
+            output = self.__decoder_block(input,c,f)
             input = output
 
         final_layer = Conv2D(1, (3, 3), padding='same')(output)

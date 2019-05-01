@@ -495,14 +495,7 @@ class Evaluate(Visualize):
             recall = 1.0
         
         return tP, fP, fN, precision, recall
-
-    def calculate_p_r(self,df,range_roots_per_image=range(1,6)):
-        for rr in range_roots_per_image:
-            for _ , row in df.iterrows():
-                if len(row['roots']) >= rr:
-                    tP, fP, fN, precicion, recall = self.get_root_precicion_v2(row["name"])
-
-
+        
     def get_false_negative_mask(self,index):
         if index == 'random':
             raise ValueError('Random not supported here!')
