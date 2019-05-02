@@ -161,8 +161,8 @@ class Visualize():
                         circ = patches.Circle(tuple(root_y),5,facecolor='yellow')
                         ax.add_patch(circ)
             ax.imshow(self.img,cmap='gray')
-            #if "roots" in self.selected_row:
-                #ax.imshow(self.msk, alpha=0.4)
+            if "roots" in self.selected_row:
+                ax.imshow(self.msk, alpha=0.4)
         if self.mode == 'image_prediction_contour':
             self.predict()
             ax.imshow(self.img,cmap='gray')
@@ -199,6 +199,7 @@ class Visualize():
                 msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
             elif self.pred_layer == 2:
                 msk = imread('../data/00_all/masks_matlab2/'+self.selected_row['name'].values[0])
+                msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
             
             self.msk = resize(msk,self.input_shape[:2]).reshape(*self.input_shape[:2])
             self.msk = img_as_float(self.msk)
@@ -314,11 +315,11 @@ class Evaluate(Visualize):
 
         return iou
 
-    def get_root_pred_coord_v1(self,prediction,threshold=0.5):
+    def get_root_pred_coord_v1(self,prediction,threshold=0.8):
         prediction = prediction > threshold
         labels = skimage.measure.label(prediction)
         roots_pred = skimage.measure.regionprops(labels)
-        roots_pred = [r for r in roots_pred if r.area > 200]
+        roots_pred = [r for r in roots_pred if r.area > 1500]
         roots_pred = [r.centroid for r in roots_pred]
         roots_pred = [list(p) for p in roots_pred] #Convert to same format
         roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y

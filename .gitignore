@@ -15,6 +15,9 @@ tensorboard/
 01_augmented/
 02_test/
 03_test/
+04_test/
+05_test/
+06_test/
 LabelingTool/
 saved_models/
 _Git_Config/
