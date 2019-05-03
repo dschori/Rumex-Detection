@@ -265,6 +265,42 @@ class Evaluate(Visualize):
             iaa.LinearContrast(alpha=1.0)
         ])
 
+    def get_seg_eval_metrics(self,prediction_threshold=0.7,dc_threshold=0.7):
+        DCs = []
+        TPs = []
+        FPs = []
+        FNs = []
+        names = []
+        for i in log_progress(range(len(self.df)),name="Samples to Test"):
+            self.selected_row = self.df.iloc[[i]]
+            self.load_data()
+            self.predict()
+            pred = self.prediction > prediction_threshold
+            msk = self.msk > 0.5
+            DC = self.__dice_score(msk,pred)
+            pred = pred.flatten()
+            msk = msk.flatten()
+            TP = np.sum(pred == msk) / len(msk)
+            FP = 0
+            for gt,p in zip(msk,pred):
+                if p == 1 and gt == 0:
+                    FP += 1
+            FP /= len(msk)
+            FN = 0
+            FN = 0 if DC > dc_threshold else 1
+            #for gt,p in zip(msk,pred):
+            #    if p == 0 and gt == 1:
+            #        FN += 1
+            #FN /= len(msk)
+            name = self.df.iloc[[i]].name
+            DCs.append(DC)
+            TPs.append(TP)
+            FPs.append(FP)
+            FNs.append(FN)
+            names.append(name)
+            print(str(DC) + " | " + str(TP) + " | " + str(FP) + " | " + str(FN) + " | " + str(name))
+        return DCs, TPs, FPs, FNs, names 
+
     def get_dice_coeff_score(self,mode='simple'):
         assert mode=='simple' or mode=='raw', 'Mode must be "simple" or "raw"'
         dice_coeffs = []
