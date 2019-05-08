@@ -168,7 +168,7 @@ class Visualize():
             ax.imshow(self.img,cmap='gray')
             CS = ax.contour(self.msk,[-1,1],colors='cyan',linewidths=3)
             if self.prediction_threshold == None:
-                ax.imshow(self.prediction>0.5, alpha=0.5)
+                ax.imshow(self.prediction>0.7, alpha=0.5)
             else:
                 ax.imshow(self.prediction>self.prediction_threshold, alpha=0.4)
             
@@ -211,6 +211,8 @@ class Visualize():
         if self.model.layers[0].input_shape[1:] != self.input_shape:
             raise ValueError('Modelinput and Image Shape doesnt match \n ' + 'Modelinput Shape is: ' + str(self.model.layers[0].input_shape[1:]) + '\n' + 'Defined Input Shape is: ' + str(self.input_shape))
         #self.img = exposure.equalize_adapthist(self.img, clip_limit=0.03)
+
+        self.img = self.__normalize(self.img)
         
         self.img = (self.img*255).astype("uint8")
         self.img = self.seq_norm.augment_image(self.img)
@@ -237,6 +239,16 @@ class Visualize():
             y_pred_f = np.ndarray.flatten(self.prediction.astype(float))
             intersection = np.sum(y_true_f * y_pred_f)
             self.dice_score = (2. * intersection + smooth) / (np.sum(y_true_f) + np.sum(y_pred_f) + smooth)
+
+    def __normalize(self,img):
+        img -= img.mean()
+        img /= (img.std() +1e-5)
+        img *= 0.1
+
+        img += 0.5
+        img = np.clip(img,0,1)
+
+        return img
 
     # https://www.kaggle.com/gauss256/preprocess-images
 
@@ -266,7 +278,7 @@ class Evaluate(Visualize):
             iaa.LinearContrast(alpha=1.0)
         ])
 
-    def get_seg_eval_metrics(self,prediction_threshold=0.7,dc_threshold=0.7):
+    def get_seg_eval_metrics(self,prediction_threshold=0.7,dc_threshold=0.7,print_output=False):
         DCs = []
         TPs = []
         FPs = []
@@ -299,7 +311,8 @@ class Evaluate(Visualize):
             FPs.append(FP)
             FNs.append(FN)
             names.append(name)
-            print(str(DC) + " | " + str(TP) + " | " + str(FP) + " | " + str(FN) + " | " + str(name))
+            if print_output:
+                print(str(DC) + " | " + str(TP) + " | " + str(FP) + " | " + str(FN) + " | " + str(name))
         return DCs, TPs, FPs, FNs, names 
 
     def get_dice_coeff_score(self,mode='simple'):

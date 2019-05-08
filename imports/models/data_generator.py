@@ -83,12 +83,14 @@ class DataGenerator(keras.utils.Sequence):
         'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
         # Initialization
         imgs = np.empty((self.batch_size, *self.target_size, self.input_channels),dtype=float)
-        masks = np.empty((self.batch_size, *self.target_size, 0+self.mask_channels))
+        masks = np.empty((self.batch_size, *self.target_size, 1+self.mask_channels))
         # Generate data
         ind = 0
         for _, row in tmp_df.iterrows():
             img = imread(row['image_path']+row['name'])
+            #img = imread('../data/00_all/masks_matlab2/'+row['name'])
             msk = imread(row['mask_path']+row['name'])
+            #msk = imread('../data/00_all/masks_matlab3/'+row['name'])
             #msk_circle = imread(row['mask_cirlce_path']+row['name'])
             msk_circle = imread('../data/00_all/masks_matlab2/'+row['name'])
             
@@ -96,8 +98,10 @@ class DataGenerator(keras.utils.Sequence):
             msk = resize(msk,self.target_size)
             msk_circle = resize(msk_circle,self.target_size)
 
-            assert img.shape[2] == 3, "Number of Color Channels must be 3"
+            #assert img.shape[2] == 3, "Number of Color Channels must be 3"
             
+            img = self.__normalize(img)
+
             if self.hist_equal == True:
                 #img = exposure.equalize_adapthist(img, clip_limit=0.03)
                 img = (img*255).astype("uint8")
@@ -107,9 +111,9 @@ class DataGenerator(keras.utils.Sequence):
             if self.augment_data == True:
                 img, msk, msk_circle = self.__augment_data(img,msk,msk_circle)
 
-            imgs[ind,] = img
-            #masks[ind,:,:,0] = msk
-            masks[ind,:,:,0] = msk_circle
+            imgs[ind,] = img.reshape(*self.target_size, self.input_channels)
+            masks[ind,:,:,0] = msk
+            masks[ind,:,:,1] = msk_circle
             ind += 1
 
         #return imgs, masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1)
@@ -154,6 +158,16 @@ class DataGenerator(keras.utils.Sequence):
         mask[mask > 0.5] = 1
         mask[mask <= 0.5] = 0
         return (img,mask,msk_circle)
+
+    def __normalize(self,img):
+        img -= img.mean()
+        img /= (img.std() +1e-5)
+        img *= 0.1
+
+        img += 0.5
+        img = np.clip(img,0,1)
+
+        return img
         
     def __save_data(self,img,mask):
         self.save_index += 1
