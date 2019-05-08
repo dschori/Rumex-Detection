@@ -168,9 +168,10 @@ class Visualize():
             ax.imshow(self.img,cmap='gray')
             CS = ax.contour(self.msk,[-1,1],colors='cyan',linewidths=3)
             if self.prediction_threshold == None:
-                ax.imshow(self.prediction, alpha=0.4)
+                ax.imshow(self.prediction>0.5, alpha=0.5)
             else:
                 ax.imshow(self.prediction>self.prediction_threshold, alpha=0.4)
+            
         if self.mode == 'normalized_gray':
             norm = rgb2gray(self.img)
             norm = (norm-np.mean(norm))/np.std(norm)
