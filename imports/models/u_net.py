@@ -8,6 +8,16 @@ from imports.models.coord import CoordinateChannel2D
 from imports.models.losses import bce_dice_loss, dice_loss, weighted_bce_dice_loss, weighted_dice_loss, dice_coeff, iou, iou_loss, iou_score
 import numpy as np
 
+from keras_applications.resnet import ResNet101
+import keras
+import keras_applications
+keras_applications.set_keras_submodules(
+    backend=keras.backend,
+    layers=keras.layers,
+    models=keras.models,
+    utils=keras.utils
+)
+
 ## Simple UNet:
 def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
 
@@ -275,7 +285,7 @@ class UNet():
         return self.model
 
     def __compile_model(self):
-        self.model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou_score])
+        self.model.compile(optimizer=Adam(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou_score])
 
     def freeze_encoder(self,model):
         self.model = model
@@ -350,12 +360,18 @@ class UNet():
         origin = input
         input = CoordinateChannel2D()(input) if coord_conv == True else input
 
-        if encoder_type == "inception_v3":
-            base_model = InceptionV3(weights="imagenet",include_top=False)
-            concats_list.append(base_model.get_layer("activation_99")) #(None, 124, 188, 192
-            concats_list.append(base_model.get_layer("mixed2")) #(None, 61, 93, 288)
-            concats_list.append(base_model.get_layer("mixed7")) #(None, 30, 46, 768)
-            concats_list.append(base_model.get_layer("mixed10")) #(None, 14, 22, 1280)
+        if encoder_type == "resnet101":
+            encoder_pretrained = ResNet101(include_top=False,weights='imagenet',input_tensor=input,input_shape=input_shape)
+            concats_list.append(encoder_pretrained.get_layer('conv1_relu').output) #64, 256*384
+            concats_list.append(encoder_pretrained.get_layer('conv2_block3_out').output) #256 128*192
+            concats_list.append(encoder_pretrained.get_layer('conv3_block4_out').output) #512 64*96
+            concats_list.append(encoder_pretrained.get_layer('conv4_block23_out').output) #1024 32*48
+            
+            center = MaxPooling2D((2, 2), strides=(2, 2))(encoder_pretrained.layers[-1].output)
+            center = Conv2D(2048, (3, 3), padding='same', activation='relu')(center)
+            center = BatchNormalization()(center)
+            conc_layer = encoder_pretrained.layers[-1].output
+
 
         if encoder_type == "vgg19":
             down, concat_layer = self.__encoder_block(input,64,self.decoder_block_names[0])
@@ -396,11 +412,20 @@ class UNet():
         input = center
 
         # upsampling:
-        for f,c in zip([512,256,128,64,32],concats_list[::-1]):
-            output = self.__decoder_block(input,c,f)
-            input = output
+        if encoder_type == "resnet101":
+            for f,c in zip([512,256,128,64],concats_list[::-1]):
+                output = self.__decoder_block(conc_layer,c,f)
+                conc_layer = output
 
-        final_layer = Conv2D(1, (3, 3), padding='same')(output)
+            output = UpSampling2D((2,2))(output)
+            output = Conv2D(32, (3, 3), padding='same', activation='relu')(output)
+
+        if encoder_type == "vgg19" or encoder_type == "vgg16":
+            for f,c in zip([512,256,128,64,32],concats_list[::-1]):
+                output = self.__decoder_block(input,c,f)
+                input = output
+
+        final_layer = Conv2D(2, (3, 3), padding='same')(output)
         final_layer = Activation("sigmoid")(final_layer)
         self.model = Model(inputs=origin, outputs=final_layer)
         self.__compile_model()

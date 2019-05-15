@@ -100,7 +100,7 @@ class DataGenerator(keras.utils.Sequence):
 
             #assert img.shape[2] == 3, "Number of Color Channels must be 3"
             
-            img = self.__normalize(img)
+            #img = self.__normalize(img)
 
             if self.hist_equal == True:
                 #img = exposure.equalize_adapthist(img, clip_limit=0.03)
@@ -140,24 +140,6 @@ class DataGenerator(keras.utils.Sequence):
         msk_circle_aug = msk_circle_aug.astype(float)/255.0
 
         return img_aug, msk_aug, msk_circle_aug
-    
-    def __adjust_data(self,img,mask, msk_circle):
-        if len(mask.shape) == 3:
-            mask = rgb2gray(mask)
-        if len(msk_circle.shape) == 3:
-            msk_circle = rgb2gray(msk_circle)
-        if img.max() > 1.0:
-            img = img / 255
-        if mask.max() > 1.0:
-            mask = mask / 255
-        if msk_circle.max() > 1.0:
-            msk_circle = msk_circle / 255
-        if self.hist_equal == True:
-            img = exposure.equalize_adapthist(img, clip_limit=0.03)
-
-        mask[mask > 0.5] = 1
-        mask[mask <= 0.5] = 0
-        return (img,mask,msk_circle)
 
     def __normalize(self,img):
         img -= img.mean()
