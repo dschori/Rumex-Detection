@@ -53,29 +53,37 @@ class Visualize():
             iaa.LinearContrast(alpha=1.0)
         ])
 
-    def get_image(self,index):
+    def get_image(self,index="random"):
         if index == 'random':
-            raise ValueError('Random not supported here!')
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+            self.selected_row = self.df.sample(1)
+        else:
+            self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
+        self.__process_input()
         return self.img
 
     def get_mask(self,index):
         if index == 'random':
-            raise ValueError('Random not supported here!')
+            self.selected_row = self.df.sample(1)
+        else:
+            self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         return self.msk
 
     def get_roots(self,index):
         if index == 'random':
-            raise ValueError('Random not supported here!')
+            self.selected_row = self.df.sample(1)
+        else:
+            self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         return [tuple(r) for r in self.selected_row["roots"].values[0]]
             
     def get_prediction(self,index):
         if index == 'random':
-            raise ValueError('Random not supported here!')
+            self.selected_row = self.df.sample(1)
+        else:
+            self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         self.predict()
@@ -206,13 +214,20 @@ class Visualize():
             self.msk = img_as_float(self.msk)
         else:
             self.msk = np.zeros(self.input_shape[:2])
+
+    def __process_input(self):
+        #self.img = self.__normalize(self.img)
+
+        self.img = (self.img*255).astype("uint8")
+        self.img = self.seq_norm.augment_image(self.img)
+        self.img = self.img.astype(float)/255.0
         
     def predict(self):
         if self.model.layers[0].input_shape[1:] != self.input_shape:
             raise ValueError('Modelinput and Image Shape doesnt match \n ' + 'Modelinput Shape is: ' + str(self.model.layers[0].input_shape[1:]) + '\n' + 'Defined Input Shape is: ' + str(self.input_shape))
         #self.img = exposure.equalize_adapthist(self.img, clip_limit=0.03)
 
-        self.img = self.__normalize(self.img)
+        #self.img = self.__normalize(self.img)
         
         self.img = (self.img*255).astype("uint8")
         self.img = self.seq_norm.augment_image(self.img)
