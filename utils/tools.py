@@ -24,6 +24,7 @@ from skimage.morphology import watershed
 from scipy import ndimage
 
 from utils.utils import *
+from utils.log_progress import *
 
 import imgaug as ia
 from imgaug import augmenters as iaa
@@ -31,10 +32,10 @@ from imgaug import augmenters as iaa
 # https://stackoverflow.com/questions/9056957/correct-way-to-define-class-variables-in-python
 
 class Visualize():
-    def __init__(self,df,model,pred_layer=1,input_shape=(512,768,3),masktype='hand'):
+    def __init__(self,df,model,predictiontype='leaf',input_shape=(512,768,3),masktype='leaf'):
         self.df = df
         self.model = model
-        self.pred_layer = pred_layer
+        self.predictiontype = predictiontype
         self.input_shape = input_shape
         self.figsize = (15,15)
         self.prediction_threshold = None
@@ -46,7 +47,7 @@ class Visualize():
         self.dice_score = None
         self.img_shape = None
         self.model_shape = None
-        assert masktype=='auto' or masktype=='hand', 'Masktype not allowed'
+        assert masktype=='leaf' or masktype=='root', 'Masktype not allowed'
         self.masktype = masktype
         self.seq_norm = iaa.Sequential([
             iaa.CLAHE(),
@@ -204,11 +205,12 @@ class Visualize():
         self.img = img_as_float(self.img)
 
         if 'mask_path' in self.df:
-            if self.pred_layer == 1:
-                msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
-            elif self.pred_layer == 2:
-                msk = imread('../data/00_all/masks_matlab2/'+self.selected_row['name'].values[0])
-                msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
+            if self.masktype == 'leaf':
+                #msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
+                msk = imread('../data/00_all/masks_leaf-segmentation/'+self.selected_row['name'].values[0])
+            elif self.masktype == 'root':
+                msk = imread('../data/00_all/masks_root-estimation/'+self.selected_row['name'].values[0])
+                #msk = imread(self.selected_row.mask_path.values[0]+self.selected_row.name.values[0])
             
             self.msk = resize(msk,self.input_shape[:2]).reshape(*self.input_shape[:2])
             self.msk = img_as_float(self.msk)
@@ -216,8 +218,6 @@ class Visualize():
             self.msk = np.zeros(self.input_shape[:2])
 
     def __process_input(self):
-        #self.img = self.__normalize(self.img)
-
         self.img = (self.img*255).astype("uint8")
         self.img = self.seq_norm.augment_image(self.img)
         self.img = self.img.astype(float)/255.0
@@ -225,22 +225,20 @@ class Visualize():
     def predict(self):
         if self.model.layers[0].input_shape[1:] != self.input_shape:
             raise ValueError('Modelinput and Image Shape doesnt match \n ' + 'Modelinput Shape is: ' + str(self.model.layers[0].input_shape[1:]) + '\n' + 'Defined Input Shape is: ' + str(self.input_shape))
-        #self.img = exposure.equalize_adapthist(self.img, clip_limit=0.03)
-
-        #self.img = self.__normalize(self.img)
-        
+                
         self.img = (self.img*255).astype("uint8")
         self.img = self.seq_norm.augment_image(self.img)
         self.img = self.img.astype(float)/255.0
         
         tmp_img = self.img.reshape(1,*self.input_shape)
 
-        assert self.pred_layer == 1 or self.pred_layer == 2, "pred_layer number not allowed"
-        
-        if self.pred_layer == 1:
+        if self.predictiontype == 'leaf':
             self.prediction = self.model.predict(tmp_img)[:,:,:,0]
-        elif self.pred_layer == 2:
-            self.prediction = self.model.predict(tmp_img)[:,:,:,1]
+        elif self.predictiontype == 'root':
+            try:
+                self.prediction = self.model.predict(tmp_img)[:,:,:,1]
+            except IndexError:
+                self.prediction = self.model.predict(tmp_img)[:,:,:,0]
 
         self.prediction = self.prediction.reshape(*self.input_shape[:2])
         if self.prediction_threshold == None:
@@ -280,12 +278,12 @@ class Evaluate(Visualize):
     Evaluate specific Model
     Target: tbd
     '''
-    def __init__(self,df,input_shape,model,pred_layer,masktype='hand'):
+    def __init__(self,df,input_shape,model,predictiontype,masktype='leaf'):
         #Visualize.__init__(self,df,model,masktype='hand')
         self.df = df
         self.input_shape = input_shape
         self.model = model
-        self.pred_layer = pred_layer
+        self.predictiontype = predictiontype
         self.masktype = masktype
         self.prediction_threshold = None
         self.seq_norm = iaa.Sequential([
@@ -391,6 +389,7 @@ class Evaluate(Visualize):
         return roots_pred
 
     def get_root_pred_coord_v2(self,prediction):
+        assert self.masktype != "root", "Wrong Masktype"
         # https://www.pyimagesearch.com/2015/11/02/watershed-opencv/
         pred = (prediction*255).astype("uint8")
         tmp = np.zeros((512,768,3),dtype="uint8")
@@ -451,7 +450,7 @@ class Evaluate(Visualize):
         return roots_pred
         
     def get_root_precicion_v2(self,index,tolerance=60,print_distance_matrix=False):
-        assert self.pred_layer == 2, "Wrong Prediction Layer"
+        assert self.masktype != "root", "Wrong Masktype"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         self.predict()
@@ -501,7 +500,6 @@ class Evaluate(Visualize):
         return tP, fP, fN, precision, recall
 
     def get_root_precicion(self,index,tolerance=60,print_distance_matrix=False):
-        assert self.pred_layer == 2, "Wrong Prediction Layer"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         self.predict()
