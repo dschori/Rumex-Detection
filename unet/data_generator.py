@@ -24,7 +24,7 @@ from skimage.transform import rescale, resize
 # Based on Keras Sequence Class
 class DataGenerator(keras.utils.Sequence):
     'Generates data for Keras'
-    def __init__(self, df,hist_equal=False, augment_data=False, batch_size=2, target_size=Config.SHAPE, shuffle=True,save_images=False, input_channels=3):
+    def __init__(self, df,hist_equal=False, augment_data=False, batch_size=2, target_size=Config.SHAPE, shuffle=True,save_images=False, input_channels=3, output="both"):
         'Initialization'
         self.df = df
         self.hist_equal = hist_equal
@@ -34,6 +34,7 @@ class DataGenerator(keras.utils.Sequence):
         self.shuffle = shuffle
         self.save_images = save_images
         self.input_channels = input_channels
+        self.output = output
         self.save_index = 0
         self.mask_channels = 1
         self.__init_info()
@@ -51,7 +52,7 @@ class DataGenerator(keras.utils.Sequence):
             ]),
         ], random_order=True)
         self.seq_img = iaa.Sequential([
-            iaa.Add((-20,20)),
+            iaa.Add((-60,60)),
         ])
         self.seq_norm = iaa.Sequential([
             iaa.CLAHE(),
@@ -83,63 +84,69 @@ class DataGenerator(keras.utils.Sequence):
         'Generates data containing batch_size samples' # X : (n_samples, *dim, n_channels)
         # Initialization
         imgs = np.empty((self.batch_size, *self.target_size, self.input_channels),dtype=float)
-        masks = np.empty((self.batch_size, *self.target_size, 1+self.mask_channels))
+        if self.output == "both":
+            masks = np.empty((self.batch_size, *self.target_size, 2))
+        else:
+            masks = np.empty((self.batch_size, *self.target_size, 1))
         # Generate data
         ind = 0
         for _, row in tmp_df.iterrows():
             img = imread(row['image_path']+row['name'])
-            #img = imread('../data/00_all/masks_matlab2/'+row['name'])
-            msk = imread(row['mask_path']+row['name'])
-            #msk = imread('../data/00_all/masks_matlab3/'+row['name'])
-            #msk_circle = imread(row['mask_cirlce_path']+row['name'])
-            msk_circle = imread('../data/00_all/masks_matlab2/'+row['name'])
+            
+            msk_leaf = imread('../data/00_all/masks_leaf-segmentation/'+row['name'])
+            msk_root = imread('../data/00_all/masks_root-estimation/'+row['name'])
             
             img = resize(img,self.target_size)
-            msk = resize(msk,self.target_size)
-            msk_circle = resize(msk_circle,self.target_size)
+            msk_leaf = resize(msk_leaf,self.target_size)
+            msk_root = resize(msk_root,self.target_size)
 
             #assert img.shape[2] == 3, "Number of Color Channels must be 3"
             
             #img = self.__normalize(img)
 
             if self.hist_equal == True:
-                #img = exposure.equalize_adapthist(img, clip_limit=0.03)
                 img = (img*255).astype("uint8")
                 img = self.seq_norm.augment_image(img)
                 img = img.astype(float)/255.0
 
             if self.augment_data == True:
-                img, msk, msk_circle = self.__augment_data(img,msk,msk_circle)
+                img, msk_leaf, msk_root = self.__augment_data(img,msk_leaf,msk_root)
 
             imgs[ind,] = img.reshape(*self.target_size, self.input_channels)
-            masks[ind,:,:,0] = msk
-            masks[ind,:,:,1] = msk_circle
+
+            if self.output == "both":
+                masks[ind,:,:,0] = msk_leaf
+                masks[ind,:,:,1] = msk_root
+            if self.output == "leaf":
+                masks[ind,:,:,0] = msk_leaf
+            if self.output == "root":
+                masks[ind,:,:,0] = msk_root
             ind += 1
 
         #return imgs, masks[:,:,:,0].reshape(self.batch_size,*self.target_size,1)
         return imgs, masks
     
-    def __augment_data(self,img,msk,msk_circle):
+    def __augment_data(self,img,msk_leaf,msk_root):
 
         img = (img*255).astype("uint8")
-        msk = (msk*255).astype("uint8")
-        msk_circle = (msk_circle*255).astype("uint8")
+        msk_leaf = (msk_leaf*255).astype("uint8")
+        msk_root = (msk_root*255).astype("uint8")
         
-        img_aug = self.seq_img.augment_image(img)
+        img = self.seq_img.augment_image(img)
         
         seq_det = self.seq.to_deterministic()
 
-        img_aug = seq_det.augment_image(img_aug)
-        msk_aug = seq_det.augment_image(msk.reshape(*self.target_size,1))
-        msk_aug = msk_aug.reshape(*self.target_size)
-        msk_circle_aug = seq_det.augment_image(msk_circle.reshape(*self.target_size))
-        msk_circle_aug = msk_circle_aug.reshape(*self.target_size)
+        img = seq_det.augment_image(img)
+        msk_leaf = seq_det.augment_image(msk_leaf.reshape(*self.target_size,1))
+        msk_leaf = msk_leaf.reshape(*self.target_size)
+        msk_root = seq_det.augment_image(msk_root.reshape(*self.target_size))
+        msk_root = msk_root.reshape(*self.target_size)
 
-        img_aug = img_aug.astype(float)/255.0
-        msk_aug = msk_aug.astype(float)/255.0
-        msk_circle_aug = msk_circle_aug.astype(float)/255.0
+        img = img.astype(float)/255.0
+        msk_leaf = msk_leaf.astype(float)/255.0
+        msk_root = msk_root.astype(float)/255.0
 
-        return img_aug, msk_aug, msk_circle_aug
+        return img, msk_leaf, msk_root
 
     def __normalize(self,img):
         img -= img.mean()

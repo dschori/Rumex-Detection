@@ -347,7 +347,7 @@ class UNet():
         self.__compile_model
 
 
-    def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,coord_conv=True,input_shape=(512, 768, 3)):
+    def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,coord_conv=True,input_shape=(512, 768, 3),num_classes=2):
         
         
         self.encoder_type = encoder_type
@@ -401,7 +401,7 @@ class UNet():
                 output = self.__decoder_block(input,c,f)
                 input = output
 
-        final_layer = Conv2D(2, (3, 3), padding='same')(output)
+        final_layer = Conv2D(num_classes, (3, 3), padding='same')(output)
         final_layer = Activation("sigmoid")(final_layer)
         self.model = Model(inputs=origin, outputs=final_layer)
         self.__compile_model()
