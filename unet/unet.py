@@ -208,61 +208,7 @@ def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
             "bce" : "binary_crossentropy"}
         model.compile(optimizer=RMSprop(lr=0.0001), loss=losses, loss_weights=lossWeights, metrics=metrics)
         return model
-	
-### TODO: Implement Unet as proposed in: https://arxiv.org/abs/1505.04597
 
-def down_block(input,n_feature_maps):
-    down = input
-    for _ in range(2):
-        down = Conv2D(n_feature_maps, (3, 3), padding='same')(down)
-        down = BatchNormalization()(down)
-        down = Activation('relu')(down)
-
-    concat_layer = down
-    down = MaxPooling2D((2, 2), strides=(2, 2))(down)
-    return down, concat_layer
-
-def up_block(input,concat_layer,n_feature_maps):
-    up = UpSampling2D((2, 2))(input)
-    up = concatenate([concat_layer, up], axis=3)
-    for _ in range(3):
-        up = Conv2D(n_feature_maps, (3, 3), padding='same')(up)
-        up = BatchNormalization()(up)
-        up = Activation('relu')(up)
-    return up
-
-def get_unet_mod(input_shape=(1024, 1024, 3),
-                feature_maps=[16,32,64,128,256],
-                num_classes=1):
-    concats_list = []
-    input = Input(shape=input_shape)
-    origin = input
-    input = CoordinateChannel2D()(input)
-    
-    # downsampling:
-    for f in feature_maps:
-        output, concat_layer = down_block(input,f)
-        input = output
-        concats_list.append(concat_layer)
-
-    # center
-    center = input
-    for _ in range(2):
-        center = Conv2D(feature_maps[-1]*2, (3, 3), padding='same')(center)
-        center = BatchNormalization()(center)
-        center = Activation('relu')(center)
-
-    input = center
-    # upsampling:
-    for f,c in zip(feature_maps[::-1],concats_list[::-1]):
-        output = up_block(input,c,f)
-        input = output
-
-    final_layer = Conv2D(num_classes, (3, 3), padding='same')(output)
-    final_layer = Activation("sigmoid")(final_layer)
-    model = Model(inputs=origin, outputs=final_layer)
-    model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,"bce"])
-    return model    
 
 class UNet():
     def __init__(self):
@@ -298,33 +244,36 @@ class UNet():
                 break
         self.__compile_model()
 
-    def __decoder_block(self,input,concat_layer,n_feature_maps):
+    def __decoder_block(self,input,concat_layer,n_feature_maps,block_name):
         up = UpSampling2D((2,2))(input)
         up = concatenate([concat_layer,up],axis=3)
-        for _ in range(2):
-            up = Conv2D(n_feature_maps,(3,3),padding='same', activation='relu')(up)
+        for i in range(2):
+            up = Conv2D(n_feature_maps,(3,3),padding='same', activation='relu',name=block_name+str(i+1))(up)
             up = BatchNormalization()(up)
         return up
 
-    def __encoder_block(self,input,n_feature_maps,names):
+    def __encoder_block(self,input,n_feature_maps,block_name):
         down = input
-        for n in names:
-            down = Conv2D(n_feature_maps, (3, 3), padding='same', activation='relu',name=n)(down)
+        for i in range(2):
+            down = Conv2D(n_feature_maps, (3, 3), padding='same', activation='relu',name=block_name+str(i+1))(down)
             down = BatchNormalization()(down) if self.batchnorm == True else down
 
         concat_layer = down
         down = MaxPooling2D((2, 2), strides=(2, 2))(down)
         return down, concat_layer
 
-    def create_model(self,batch_norm=True,input_shape=(512,768,3),feature_maps=[16,32,64,128,256,512],num_classes=2):
+    def create_model(self,batch_norm=True,input_shape=(512,768,3),feature_maps=[16,32,64,128,256],num_classes=2):
         self.batchnorm = batch_norm
         concats_list = []
         input = Input(shape=input_shape)
         origin = input
         
         # downsampling:
+        i=0
         for f in feature_maps:
-            output, concat_layer = self.__encoder_block(input,f,(str(f)+"a",str(f)+"b"))
+            i+=1
+            block_name = 'encoder_block' + str(i) + "_conv"
+            output, concat_layer = self.__encoder_block(input,f,block_name)
             input = output
             concats_list.append(concat_layer)
 
@@ -337,8 +286,11 @@ class UNet():
 
         input = center
         # upsampling:
+        i=0
         for f,c in zip(feature_maps[::-1],concats_list[::-1]):
-            output = up_block(input,c,f)
+            i+=1
+            block_name = 'decoder_block' + str(i) + "_conv"
+            output = self.__decoder_block(input,c,f,block_name)
             input = output
 
         final_layer = Conv2D(num_classes, (3, 3), padding='same')(output)
@@ -347,9 +299,7 @@ class UNet():
         self.__compile_model
 
 
-    def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,coord_conv=True,input_shape=(512, 768, 3),num_classes=2):
-        
-        
+    def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,coord_conv=True,input_shape=(512, 768, 3),num_classes=2):        
         self.encoder_type = encoder_type
         self.batchnorm = batchnorm
         concats_list = []
@@ -364,13 +314,6 @@ class UNet():
             concats_list.append(encoder_pretrained.get_layer('conv3_block4_out').output) #512 64*96
             concats_list.append(encoder_pretrained.get_layer('conv4_block23_out').output) #1024 32*48
             center = encoder_pretrained.layers[-1].output
-
-            #concats_list.append(encoder_pretrained.get_layer('conv5_block3_out').output) #2048 16*24
-            
-            #center = MaxPooling2D((2, 2), strides=(2, 2))(encoder_pretrained.layers[-1].output)
-            #center = Conv2D(2048, (3, 3), padding='same', activation='relu')(center)
-            #center = BatchNormalization()(center)
-
 
         if encoder_type == "vgg19":
             encoder_pretrained = VGG19(include_top=False,weights='imagenet',input_tensor=input,input_shape=input_shape)
@@ -388,9 +331,12 @@ class UNet():
         input = center
 
         # upsampling:
+        i = 0
         if encoder_type == "resnet101":
             for f,c in zip([512,256,128,64],concats_list[::-1]):
-                output = self.__decoder_block(input,c,f)
+                i+=1
+                block_name = 'decoder_block' + str(i) + "_conv"
+                output = self.__decoder_block(input,c,f,block_name)
                 input = output
 
             output = UpSampling2D((2,2))(output)
@@ -398,7 +344,9 @@ class UNet():
 
         if encoder_type == "vgg19":
             for f,c in zip([512,512,256,128,64],concats_list[::-1]):
-                output = self.__decoder_block(input,c,f)
+                i+=1
+                block_name = 'decoder_block' + str(i) + "_conv"
+                output = self.__decoder_block(input,c,f,block_name)
                 input = output
 
         final_layer = Conv2D(num_classes, (3, 3), padding='same')(output)
