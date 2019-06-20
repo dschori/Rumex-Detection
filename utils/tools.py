@@ -378,11 +378,11 @@ class Evaluate(Visualize):
 
         return iou
 
-    def get_root_pred_coord_v1(self,prediction,threshold=0.8):
+    def get_root_pred_coord_v1(self,prediction,threshold=0.5):
         prediction = prediction > threshold
         labels = skimage.measure.label(prediction)
         roots_pred = skimage.measure.regionprops(labels)
-        roots_pred = [r for r in roots_pred if r.area > 1500]
+        roots_pred = [r for r in roots_pred if r.area > 1000]
         roots_pred = [r.centroid for r in roots_pred]
         roots_pred = [list(p) for p in roots_pred] #Convert to same format
         roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y
@@ -449,8 +449,8 @@ class Evaluate(Visualize):
         roots_pred = [list(p) for p in roots_pred]
         return roots_pred
         
-    def get_root_precicion_v2(self,index,tolerance=60,print_distance_matrix=False):
-        assert self.masktype != "root", "Wrong Masktype"
+    def get_root_precicion_v2(self,index,tolerance=30,print_distance_matrix=False):
+        assert self.masktype == "root", "Wrong Masktype"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         self.predict()
