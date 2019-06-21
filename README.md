@@ -30,7 +30,7 @@ Prediction: Black Point, Ground Truth: Yellow Point
  * [50_weights_visualization](notebooks/50_weights_visualization.ipynb) Visualize the weights of the Convolution-Kernels of both trained and untrained model
 
 
-# UNet:
+# [UNet:](unet/):
 * [unet](unet/unet.py) Unet Class for creating both untrained and pretrained Unet with VGG19 Encoder
 * [data_generator](unet/data_generator.py) Keras Sequence Data Generator to feed the data batchwise to the network and applying prepropressing and data augmentation in parallel on cpu while training
 * [losses](unet/losses.py) Loss Functions for training
