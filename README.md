@@ -22,7 +22,7 @@ Prediction: Black Point, Ground Truth: Yellow Point
 - cv2
 - imutils
  
- # Notebooks:
+ # [Notebooks:](notebooks/)
  * [10_inspect_data](notebooks/10_inspect_data.ipynb) Resizies the images from "LabelingTool" in in same sizes including the labels (mask, root-centers, leaf-splines)
  * [20_training](notebooks/20_training.ipynb) Training Process of the Unet
  * [30_results](notebooks/30_results.ipynb) Visualize the optical Results and Evaluate both Segmentation and Root-Detection
