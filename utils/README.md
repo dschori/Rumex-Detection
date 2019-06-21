@@ -1,4 +1,4 @@
-# tools.py
+# tools.py:
 
 Functions to Visualize and Evaluate Images and Results.
 
@@ -18,13 +18,14 @@ vis_params = {'df':val20_df,
 vis = Visualize(**vis_params)
 ```
 
+### Functions:
+
 ```python
 Visualize.get_image(index)
 
-'''
+
    Send a message to a recipient
 
    :param int or str index: index of Image to load
    :return: image
-   '''
 ```
