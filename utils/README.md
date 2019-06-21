@@ -22,6 +22,7 @@ vis = Visualize(**vis_params)
 
 ```python
 Visualize.get_image(index)
+
 """
    Send a message to a recipient
 
@@ -29,3 +30,15 @@ Visualize.get_image(index)
    :return: image
 """
 ```
+___
+```python
+Visualize.get_image(index)
+
+"""
+   Send a message to a recipient
+
+   :param int or str index: index of Image to load
+   :return: image
+"""
+```
+___
