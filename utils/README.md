@@ -24,7 +24,7 @@ vis = Visualize(**vis_params)
 Visualize.get_image(index)
 
 """
-   Send a message to a recipient
+   Get Image
 
    :param int or str index: index of Image to load
    :return: image
@@ -32,13 +32,24 @@ Visualize.get_image(index)
 ```
 ___
 ```python
-Visualize.get_image(index)
+Visualize.get_mask(index)
 
 """
-   Send a message to a recipient
+   Get Mask
 
-   :param int or str index: index of Image to load
+   :param int or str index: index of Mask to load
    :return: image
+"""
+```
+___
+```python
+Visualize.get_roots(index)
+
+"""
+   Get Roots Coordinates
+
+   :param int or str index: index of Image to load roots from
+   :return: Root Coordinates as List of Tuples (x,y)
 """
 ```
 ___
