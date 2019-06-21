@@ -2,9 +2,13 @@
 
 ![alt text](assets/segmentation.png)
 
+Prediction: Yellow Mask, Ground Truth: Cyan Border
+
 ![alt text](assets/roots.png)
 
-Required Packages:
+Prediction: Black Point, Ground Truth: Yellow Point
+
+### Required Packages:
 - tensorflow
 - keras
 - pandas
