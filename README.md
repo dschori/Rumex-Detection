@@ -36,6 +36,6 @@ Prediction: Black Point, Ground Truth: Yellow Point
 * [losses](unet/losses.py) Loss Functions for training
 
 # Utils:
-* [tools](utils/tools.py) Visualization and Evaluation Tool
+* [tools](utils/tools.py) Visualization and Evaluation Tool: [tools-readme](utils/README.md)
 * [config](utils/config.py) Config File
 * [utils](utils/utils.py) Various util functions
