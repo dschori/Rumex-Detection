@@ -19,8 +19,8 @@ vis = Visualize(**vis_params)
 ```
 
 #### Functions:
-
 ```python
+
 Visualize.get_image(index)
 
 """
@@ -65,10 +65,10 @@ Visualize.get_prediction(index)
 ```
 ___
 ```python
-Visualize.show_single(index)
+Visualize.show_single(index, mode)
 
 """
-   Get Prediction of Image
+   Show Single Image
 
    :param int or str "index": index of Image to show
    :param str "mode": 
@@ -78,6 +78,25 @@ Visualize.show_single(index)
         image_prediction : shows image with overlayed prediction
         image_prediction_roots : shows image with GT mask and predicted roots
         image_prediction_contour : shows image with predicted segmentation and GT contours
+   :return: No return Value
+"""
+```
+___
+```python
+Visualize.show_matrix(index, mode, rows=4)
+
+"""
+   Show a rows x 2 Matrix of images
+
+   :param List of int or str: List of indexes to show, or "random"
+   :param str "mode": 
+        image : shows only image
+        mask : shows only mask
+        image_mask : shows image with overlayed mask
+        image_prediction : shows image with overlayed prediction
+        image_prediction_roots : shows image with GT mask and predicted roots
+        image_prediction_contour : shows image with predicted segmentation and GT contours
+   :param int "row": how much rows should be displayd
    :return: No return Value
 """
 ```
