@@ -1,7 +1,9 @@
 # Agroscope
 Repo for Rumex Optusifolius detection in field-images
 
-![alt text](docs/main.png)
+![alt text](assets/segmentation.png)
+
+![alt text](assets/roots.png)
 
 Required Packages:
 - tensorflow
@@ -15,5 +17,4 @@ Required Packages:
 - sklearn
 - matplotlib
 - cv2
-- segmentation-models
 - imutils
