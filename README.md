@@ -31,11 +31,11 @@ Prediction: Black Point, Ground Truth: Yellow Point
 
 
 # UNet:
-[unet](unet/unet.py) Unet Class for creating both untrained and pretrained Unet with VGG19 Encoder
-[data_generator](unet/data_generator.py) Keras Sequence Data Generator to feed the data batchwise to the network and applying prepropressing and data augmentation in parallel on cpu while training
-[losses](unet/losses.py) Loss Functions for training
+* [unet](unet/unet.py) Unet Class for creating both untrained and pretrained Unet with VGG19 Encoder
+* [data_generator](unet/data_generator.py) Keras Sequence Data Generator to feed the data batchwise to the network and applying prepropressing and data augmentation in parallel on cpu while training
+* [losses](unet/losses.py) Loss Functions for training
 
 # Utils:
-[tools](utils/tools.py) Visualization and Evaluation Tool
-[config](utils/config.py) Config File
-[utils](utils/utils.py) Various util functions
+* [tools](utils/tools.py) Visualization and Evaluation Tool
+* [config](utils/config.py) Config File
+* [utils](utils/utils.py) Various util functions
