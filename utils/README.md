@@ -19,7 +19,7 @@ vis = Visualize(**vis_params)
 ```
 
 ```python
-Visualize.get_image(index
+Visualize.get_image(index)
 
 '''
    Send a message to a recipient
