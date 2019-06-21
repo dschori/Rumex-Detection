@@ -101,3 +101,6 @@ Visualize.show_matrix(index, mode, rows=4)
 """
 ```
 ___
+
+
+### Evaluate (class):
