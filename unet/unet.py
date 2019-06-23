@@ -19,251 +19,17 @@ keras_applications.set_keras_submodules(
     utils=keras.utils
 )
 
-## Simple UNet:
-def get_unet(input_shape=(1024, 1024, 3),num_classes=1):
-
-    assert num_classes == 1 or num_classes == 2 , "Number of output_classes not Supportet"
-
-    inputs = Input(shape=input_shape)
-    # 1024
-
-    down0b = Conv2D(8, (3, 3), padding='same')(inputs)
-    down0b = BatchNormalization()(down0b)
-    down0b = Activation('relu')(down0b)
-    down0b = Conv2D(8, (3, 3), padding='same')(down0b)
-    down0b = BatchNormalization()(down0b)
-    down0b = Activation('relu')(down0b)
-    down0b_pool = MaxPooling2D((2, 2), strides=(2, 2))(down0b)
-    # 512
-
-    down0a = Conv2D(16, (3, 3), padding='same')(down0b_pool)
-    down0a = BatchNormalization()(down0a)
-    down0a = Activation('relu')(down0a)
-    down0a = Conv2D(16, (3, 3), padding='same')(down0a)
-    down0a = BatchNormalization()(down0a)
-    down0a = Activation('relu')(down0a)
-    down0a_pool = MaxPooling2D((2, 2), strides=(2, 2))(down0a)
-    # 256
-
-    down0 = Conv2D(32, (3, 3), padding='same')(down0a_pool)
-    down0 = BatchNormalization()(down0)
-    down0 = Activation('relu')(down0)
-    down0 = Conv2D(32, (3, 3), padding='same')(down0)
-    down0 = BatchNormalization()(down0)
-    down0 = Activation('relu')(down0)
-    down0_pool = MaxPooling2D((2, 2), strides=(2, 2))(down0)
-    # 128
-
-    down1 = Conv2D(64, (3, 3), padding='same')(down0_pool)
-    down1 = BatchNormalization()(down1)
-    down1 = Activation('relu')(down1)
-    down1 = Conv2D(64, (3, 3), padding='same')(down1)
-    down1 = BatchNormalization()(down1)
-    down1 = Activation('relu')(down1)
-    down1_pool = MaxPooling2D((2, 2), strides=(2, 2))(down1)
-    # 64
-
-    down2 = Conv2D(128, (3, 3), padding='same')(down1_pool)
-    down2 = BatchNormalization()(down2)
-    down2 = Activation('relu')(down2)
-    down2 = Conv2D(128, (3, 3), padding='same')(down2)
-    down2 = BatchNormalization()(down2)
-    down2 = Activation('relu')(down2)
-    down2_pool = MaxPooling2D((2, 2), strides=(2, 2))(down2)
-    # 32
-
-    down3 = Conv2D(256, (3, 3), padding='same')(down2_pool)
-    down3 = BatchNormalization()(down3)
-    down3 = Activation('relu')(down3)
-    down3 = Conv2D(256, (3, 3), padding='same')(down3)
-    down3 = BatchNormalization()(down3)
-    down3 = Activation('relu')(down3)
-    down3_pool = MaxPooling2D((2, 2), strides=(2, 2))(down3)
-    # 16
-
-    down4 = Conv2D(512, (3, 3), padding='same')(down3_pool)
-    down4 = BatchNormalization()(down4)
-    down4 = Activation('relu')(down4)
-    down4 = Conv2D(512, (3, 3), padding='same')(down4)
-    down4 = BatchNormalization()(down4)
-    down4 = Activation('relu')(down4)
-    down4_pool = MaxPooling2D((2, 2), strides=(2, 2))(down4)
-    # 8
-
-    center = Conv2D(1024, (3, 3), padding='same')(down4_pool)
-    center = BatchNormalization()(center)
-    center = Activation('relu')(center)
-    center = Conv2D(1024, (3, 3), padding='same')(center)
-    center = BatchNormalization()(center)
-    center = Activation('relu')(center)
-    # center
-
-    up4 = UpSampling2D((2, 2))(center)
-    up4 = concatenate([down4, up4], axis=3)
-    up4 = Conv2D(512, (3, 3), padding='same')(up4)
-    up4 = BatchNormalization()(up4)
-    up4 = Activation('relu')(up4)
-    up4 = Conv2D(512, (3, 3), padding='same')(up4)
-    up4 = BatchNormalization()(up4)
-    up4 = Activation('relu')(up4)
-    up4 = Conv2D(512, (3, 3), padding='same')(up4)
-    up4 = BatchNormalization()(up4)
-    up4 = Activation('relu')(up4)
-    # 16
-
-    up3 = UpSampling2D((2, 2))(up4)
-    up3 = concatenate([down3, up3], axis=3)
-    up3 = Conv2D(256, (3, 3), padding='same')(up3)
-    up3 = BatchNormalization()(up3)
-    up3 = Activation('relu')(up3)
-    up3 = Conv2D(256, (3, 3), padding='same')(up3)
-    up3 = BatchNormalization()(up3)
-    up3 = Activation('relu')(up3)
-    up3 = Conv2D(256, (3, 3), padding='same')(up3)
-    up3 = BatchNormalization()(up3)
-    up3 = Activation('relu')(up3)
-    # 32
-
-    up2 = UpSampling2D((2, 2))(up3)
-    up2 = concatenate([down2, up2], axis=3)
-    up2 = Conv2D(128, (3, 3), padding='same')(up2)
-    up2 = BatchNormalization()(up2)
-    up2 = Activation('relu')(up2)
-    up2 = Conv2D(128, (3, 3), padding='same')(up2)
-    up2 = BatchNormalization()(up2)
-    up2 = Activation('relu')(up2)
-    up2 = Conv2D(128, (3, 3), padding='same')(up2)
-    up2 = BatchNormalization()(up2)
-    up2 = Activation('relu')(up2)
-    # 64
-
-    up1 = UpSampling2D((2, 2))(up2)
-    up1 = concatenate([down1, up1], axis=3)
-    up1 = Conv2D(64, (3, 3), padding='same')(up1)
-    up1 = BatchNormalization()(up1)
-    up1 = Activation('relu')(up1)
-    up1 = Conv2D(64, (3, 3), padding='same')(up1)
-    up1 = BatchNormalization()(up1)
-    up1 = Activation('relu')(up1)
-    up1 = Conv2D(64, (3, 3), padding='same')(up1)
-    up1 = BatchNormalization()(up1)
-    up1 = Activation('relu')(up1)
-    # 128
-
-    up0 = UpSampling2D((2, 2))(up1)
-    up0 = concatenate([down0, up0], axis=3)
-    up0 = Conv2D(32, (3, 3), padding='same')(up0)
-    up0 = BatchNormalization()(up0)
-    up0 = Activation('relu')(up0)
-    up0 = Conv2D(32, (3, 3), padding='same')(up0)
-    up0 = BatchNormalization()(up0)
-    up0 = Activation('relu')(up0)
-    up0 = Conv2D(32, (3, 3), padding='same')(up0)
-    up0 = BatchNormalization()(up0)
-    up0 = Activation('relu')(up0)
-    # 256
-
-    up0a = UpSampling2D((2, 2))(up0)
-    up0a = concatenate([down0a, up0a], axis=3)
-    up0a = Conv2D(16, (3, 3), padding='same')(up0a)
-    up0a = BatchNormalization()(up0a)
-    up0a = Activation('relu')(up0a)
-    up0a = Conv2D(16, (3, 3), padding='same')(up0a)
-    up0a = BatchNormalization()(up0a)
-    up0a = Activation('relu')(up0a)
-    up0a = Conv2D(16, (3, 3), padding='same')(up0a)
-    up0a = BatchNormalization()(up0a)
-    up0a = Activation('relu')(up0a)
-    # 512
-
-    up0b = UpSampling2D((2, 2))(up0a)
-    up0b = concatenate([down0b, up0b], axis=3)
-    up0b = Conv2D(8, (3, 3), padding='same')(up0b)
-    up0b = BatchNormalization()(up0b)
-    up0b = Activation('relu')(up0b)
-    up0b = Conv2D(8, (3, 3), padding='same')(up0b)
-    up0b = BatchNormalization()(up0b)
-    up0b = Activation('relu')(up0b)
-    up0b = Conv2D(8, (3, 3), padding='same')(up0b)
-    up0b = BatchNormalization()(up0b)
-    up0b = Activation('relu')(up0b)
-    # 1024
-
-    if num_classes == 1:
-        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(up0b)
-        model = Model(inputs=inputs, outputs=map1)
-        model.compile(optimizer=RMSprop(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,keras.losses.binary_crossentropy])
-        return model
-    elif num_classes == 2:
-        map1 = Conv2D(1, (1, 1), activation='sigmoid',name="map1")(up0b)
-        map2 = Conv2D(1, (1, 1), activation='sigmoid',name="map2")(up0b)
-        model = Model(inputs=inputs, outputs=[map1, map2],)
-        losses = {
-        "map1": bce_dice_loss,
-        "map2": "binary_crossentropy"}   
-        lossWeights = {"map1": 2.0, "map2": 1.0}
-        metrics = {
-            "map1" : dice_coeff,
-            "map2" : iou,
-            "bce" : "binary_crossentropy"}
-        model.compile(optimizer=RMSprop(lr=0.0001), loss=losses, loss_weights=lossWeights, metrics=metrics)
-        return model
-
-
 class UNet():
     def __init__(self):
         self.model = None
-        self.batchnorm = None
+        self.batch_norm = None
         self.encoder_type = None
 
     def get_model(self):
         return self.model
 
-    def __compile_model(self):
-        self.model.compile(optimizer=Adam(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou_score])
-
-    def freeze_encoder(self,model,encoder_type):
-        self.model = model
-
-        for layer in self.model.layers:
-            layer.trainable = False
-            if layer.name == "conv5_block3_out" and encoder_type == "resnet101":
-                break
-            if layer.name == "block5_pool" and encoder_type == "vgg19":
-                break
-        self.__compile_model()
-
-    def unfreeze_encoder(self,model,encoder_type):
-        self.model = model
-
-        for layer in self.model.layers:
-            layer.trainable = True
-            if layer.name == "conv5_block3_out" and encoder_type == "resnet101":
-                break
-            if layer.name == "block5_pool" and encoder_type == "vgg19":
-                break
-        self.__compile_model()
-
-    def __decoder_block(self,input,concat_layer,n_feature_maps,block_name):
-        up = UpSampling2D((2,2))(input)
-        up = concatenate([concat_layer,up],axis=3)
-        for i in range(2):
-            up = Conv2D(n_feature_maps,(3,3),padding='same', activation='relu',name=block_name+str(i+1))(up)
-            up = BatchNormalization()(up)
-        return up
-
-    def __encoder_block(self,input,n_feature_maps,block_name):
-        down = input
-        for i in range(2):
-            down = Conv2D(n_feature_maps, (3, 3), padding='same', activation='relu',name=block_name+str(i+1))(down)
-            down = BatchNormalization()(down) if self.batchnorm == True else down
-
-        concat_layer = down
-        down = MaxPooling2D((2, 2), strides=(2, 2))(down)
-        return down, concat_layer
-
     def create_model(self,batch_norm=True,input_shape=(512,768,3),feature_maps=[16,32,64,128,256],num_classes=2):
-        self.batchnorm = batch_norm
+        self.batch_norm = batch_norm
         concats_list = []
         input = Input(shape=input_shape)
         origin = input
@@ -299,9 +65,9 @@ class UNet():
         self.__compile_model
 
 
-    def create_pretrained_model(self,encoder_type='vgg19',batchnorm=True,coord_conv=True,input_shape=(512, 768, 3),num_classes=2):        
+    def create_pretrained_model(self,encoder_type='vgg19',batch_norm=True,coord_conv=True,input_shape=(512, 768, 3),num_classes=2):        
         self.encoder_type = encoder_type
-        self.batchnorm = batchnorm
+        self.batch_norm = batch_norm
         concats_list = []
         input = Input(shape=input_shape)
         origin = input
@@ -324,7 +90,7 @@ class UNet():
             concats_list.append(encoder_pretrained.get_layer('block5_conv4').output) #512 32*48
 
             center = encoder_pretrained.layers[-1].output
-            for _ in range(2):
+            for _ in range(1):
                 center = Conv2D(1024, (3, 3), padding='same', activation='relu')(center)
                 center = BatchNormalization()(center)
 
@@ -343,7 +109,7 @@ class UNet():
             output = Conv2D(32, (3, 3), padding='same', activation='relu')(output)
 
         if encoder_type == "vgg19":
-            for f,c in zip([512,512,256,128,64],concats_list[::-1]):
+            for f,c in zip([256,128,64,32,16],concats_list[::-1]):
                 i+=1
                 block_name = 'decoder_block' + str(i) + "_conv"
                 output = self.__decoder_block(input,c,f,block_name)
@@ -353,3 +119,46 @@ class UNet():
         final_layer = Activation("sigmoid")(final_layer)
         self.model = Model(inputs=origin, outputs=final_layer)
         self.__compile_model()
+
+    def freeze_encoder(self,model,encoder_type):
+        self.model = model
+
+        for layer in self.model.layers:
+            layer.trainable = False
+            if layer.name == "conv5_block3_out" and encoder_type == "resnet101":
+                break
+            if layer.name == "block5_pool" and encoder_type == "vgg19":
+                break
+        self.__compile_model()
+
+    def unfreeze_encoder(self,model,encoder_type):
+        self.model = model
+
+        for layer in self.model.layers:
+            layer.trainable = True
+            if layer.name == "conv5_block3_out" and encoder_type == "resnet101":
+                break
+            if layer.name == "block5_pool" and encoder_type == "vgg19":
+                break
+        self.__compile_model()
+
+    def __decoder_block(self,input,concat_layer,n_feature_maps,block_name):
+        up = UpSampling2D((2,2))(input)
+        up = concatenate([concat_layer,up],axis=3)
+        for i in range(2):
+            up = Conv2D(n_feature_maps,(3,3),padding='same', activation='relu',name=block_name+str(i+1))(up)
+            up = BatchNormalization()(up)
+        return up
+
+    def __encoder_block(self,input,n_feature_maps,block_name):
+        down = input
+        for i in range(2):
+            down = Conv2D(n_feature_maps, (3, 3), padding='same', activation='relu',name=block_name+str(i+1))(down)
+            down = BatchNormalization()(down) if self.batch_norm == True else down
+
+        concat_layer = down
+        down = MaxPooling2D((2, 2), strides=(2, 2))(down)
+        return down, concat_layer
+
+    def __compile_model(self):
+        self.model.compile(optimizer=Adam(lr=0.0001), loss=bce_dice_loss, metrics=[dice_coeff,iou_score])

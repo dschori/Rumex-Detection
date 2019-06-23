@@ -55,6 +55,13 @@ class Visualize():
         ])
 
     def get_image(self,index="random"):
+        """
+        Get Image
+
+        :param int or str "index": index of Image to load
+        :return: image
+        
+        """
         if index == 'random':
             self.selected_row = self.df.sample(1)
         else:
@@ -64,33 +71,62 @@ class Visualize():
         return self.img
 
     def get_mask(self,index):
+        """
+        Get Mask
+
+        :param int or str "index": index of Mask to load
+        :return: image
+        
+        """
         if index == 'random':
             self.selected_row = self.df.sample(1)
         else:
             self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         return self.msk
 
     def get_roots(self,index):
+        """
+        Get Roots Coordinates
+
+        :param int or str "index": index of Image to load roots from
+        :return: Root Coordinates as List of Tuples (x,y)
+        """
         if index == 'random':
             self.selected_row = self.df.sample(1)
         else:
             self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         return [tuple(r) for r in self.selected_row["roots"].values[0]]
             
     def get_prediction(self,index):
+        """
+        Get Prediction of Image
+
+        :param int or str "index": index of Image to make prediction
+        :return: Prediction as Image
+        """
         if index == 'random':
             self.selected_row = self.df.sample(1)
         else:
             self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         self.predict()
         return self.prediction
             
     def show_single(self,index,mode):
+        """
+        Show Single Image
+
+        :param int or str "index": index of Image to show
+        :param str "mode": 
+                image : shows only image
+                mask : shows only mask
+                image_mask : shows image with overlayed mask
+                image_prediction : shows image with overlayed prediction
+                image_prediction_roots : shows image with GT mask and predicted roots
+                image_prediction_contour : shows image with predicted segmentation and GT contours
+        :return: No return Value
+        """
         self.mode = mode
         if index == 'random':
             self.selected_row = self.df.sample(1)
@@ -100,6 +136,20 @@ class Visualize():
         self.__add_image(self.selected_row,ax)
 
     def show_matrix(self,index,mode,rows=4):
+        """
+        Show a rows x 2 Matrix of images
+
+        :param List of int or str: List of indexes to show, or "random"
+        :param str "mode": 
+                image : shows only image
+                mask : shows only mask
+                image_mask : shows image with overlayed mask
+                image_prediction : shows image with overlayed prediction
+                image_prediction_roots : shows image with GT mask and predicted roots
+                image_prediction_contour : shows image with predicted segmentation and GT contours
+        :param int "row": how much rows should be displayd
+        :return: No return Value
+        """
         self.mode = mode
         # Create empty header:
         selected_rows = pd.DataFrame().reindex_like(self.df).head(0)
@@ -328,6 +378,36 @@ class Evaluate(Visualize):
                 print(str(DC) + " | " + str(TP) + " | " + str(FP) + " | " + str(FN) + " | " + str(name))
         return DCs, TPs, FPs, FNs, names 
 
+    def get_dice_score(self, index, prediction_threshold=0.8):
+        """
+        Get dice coefficent of a prediction from a single image
+
+        :param int "index": index of image to load
+        :return: dice score
+        """
+        assert index != 'random', "Random not supported here!"
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        self.load_data()
+        self.predict()
+        pred = self.prediction > prediction_threshold
+        msk = self.msk > 0.5
+        return self.__dice_score(msk, pred)
+
+    def get_iou_score(self, index, prediction_threshold=0.8):
+        """
+        Get iou score of a prediction from a single image
+
+        :param int "index": index of image to load
+        :return: iou score
+        """
+        assert index != 'random', "Random not supported here!"
+        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
+        self.load_data()
+        self.predict()
+        pred = self.prediction > prediction_threshold
+        msk = self.msk > 0.5
+        return self.img, msk, pred, self.__dice_score(msk, pred)
+
     def get_dice_coeff_score(self,mode='simple'):
         assert mode=='simple' or mode=='raw', 'Mode must be "simple" or "raw"'
         dice_coeffs = []
@@ -346,7 +426,7 @@ class Evaluate(Visualize):
         elif mode == 'raw':
             return dice_coeffs
 
-    def get_iou_score(self,mode='simple'):
+    def get_iou_score_v0(self,mode='simple'):
         iou_scores = []
         for i in log_progress(range(len(self.df)),name='Samples to Test'):
             self.selected_row = self.df.iloc[[i]]
@@ -367,6 +447,8 @@ class Evaluate(Visualize):
     
     def __iou_score(self,y_true, y_pred, smooth=1e-12):
         #https://github.com/qubvel/segmentation_models/blob/master/segmentation_models/metrics.py
+        y_true = y_true.reshape(1,*self.input_shape[:2],1)
+        y_pred = y_pred.reshape(1,*self.input_shape[:2],1)
         axes = (1, 2)
 
         intersection = np.sum(y_true * y_pred, axis=axes)
@@ -378,11 +460,11 @@ class Evaluate(Visualize):
 
         return iou
 
-    def get_root_pred_coord_v1(self,prediction,threshold=0.5):
+    def get_root_pred_coord_v1(self,prediction,threshold=0.4):
         prediction = prediction > threshold
         labels = skimage.measure.label(prediction)
         roots_pred = skimage.measure.regionprops(labels)
-        roots_pred = [r for r in roots_pred if r.area > 1000]
+        roots_pred = [r for r in roots_pred if r.area > 500]
         roots_pred = [r.centroid for r in roots_pred]
         roots_pred = [list(p) for p in roots_pred] #Convert to same format
         roots_pred = [p[::-1] for p in roots_pred] #Flipp X,Y
@@ -432,8 +514,6 @@ class Evaluate(Visualize):
             mask[labels == label] = 255
             if np.sum(mask[labels == label]) < 300000:
                 continue
-            
-            #print(np.sum(mask[labels == label]))
         
             # detect contours in the mask and grab the largest one
             cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
@@ -449,7 +529,7 @@ class Evaluate(Visualize):
         roots_pred = [list(p) for p in roots_pred]
         return roots_pred
         
-    def get_root_precicion_v2(self,index,tolerance=30,print_distance_matrix=False):
+    def get_root_precicion(self,index,tolerance=30,print_distance_matrix=False):
         assert self.masktype == "root", "Wrong Masktype"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
@@ -485,67 +565,6 @@ class Evaluate(Visualize):
             # If there are roots in the image but we predict none:
             tP = 0
             fN = len(roots_true)
-            fP = 0
-            precision = 0.0
-            recall = 0.0
-
-        else:
-            # If there are neither roots in the image and prediction:
-            tP = 0
-            fN = 0
-            fP = 0
-            precision = 1.0
-            recall = 1.0
-        
-        return tP, fP, fN, precision, recall
-
-    def get_root_precicion(self,index,tolerance=60,print_distance_matrix=False):
-        self.selected_row = self.df[self.df['name'].str.contains(str(index))]
-        self.load_data()
-        self.predict()
-        roots_true = (list(self.selected_row["roots"].values/2)[0])
-        roots_true = [list(list(t)) for t in roots_true] #Convert to same format
-        roots_pred = self.get_root_pred_coord_v2(self.prediction)
-
-        if len(roots_pred) > 0 and len(roots_true) > 0:
-            # if there are both roots in the image and we are also predict at least one:
-            ds = distance_matrix(roots_true, roots_pred)
-            # axis0 = number ground truth
-            # axis1 = number predictions
-            if print_distance_matrix == True:
-                print(ds)
-
-            all_errors = sum(ds.min(axis=1)>tolerance)
-            tP = sum(ds.min(axis=1)<=tolerance)
-            combined = 0
-            #print(tP)
-            if tP > ds.shape[1]:
-                combined = abs(tP-ds.shape[1])
-                tP -= combined
-
-            if all_errors > 0:
-                fP = ds.shape[1]-tP
-                fN = ds.shape[0]-tP
-                fN -= combined
-            else:
-                fP = 0
-                fN = 0
-
-            precision = tP / (tP+fP)
-            recall = tP / (tP+fN)
-
-        elif len(roots_true) == 0 and len(roots_pred) > 0:
-            # If there are no roots in image but we predict some:
-            tP = 0
-            fN = 0
-            fP = len(roots_pred)
-            precision = 0.0
-            recall = 0.0
-
-        elif len(roots_true) > 0 and len(roots_pred) == 0:
-            # If there are roots in the image but we predict none:
-            tP = 0
-            fN = len(roots_pred)
             fP = 0
             precision = 0.0
             recall = 0.0
