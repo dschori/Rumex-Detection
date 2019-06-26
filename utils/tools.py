@@ -578,6 +578,36 @@ class Evaluate(Visualize):
             recall = 1.0
         
         return tP, fP, fN, precision, recall
+
+    def log_root_precision_values(self, tolerance=30, print_output=False):
+        tPs = []
+        fPs = []
+        fNs = []
+        precicions = []
+        recalls = []
+        test_log = []
+        for roots_per_image in range(1,7):
+            if print_output:
+                print("Max roots_per_image: " + str(roots_per_image))
+                print("TP\tFP\tFN\tPrecicion\tRecall\tImageName")
+            for i, row in log_progress(self.df.iterrows(), every=1, size=len(self.df), name=str(roots_per_image)):
+                if len(row["roots"]) <= roots_per_image:
+                    #print(len(row["roots"]))
+                    tP, fP, fN, precicion, recall = self.get_root_precicion(row["name"],tolerance=tolerance,print_distance_matrix=False)
+                    if print_output:
+                        print("{}\t{}\t{}\t{:1.2f}\t{:1.2f}\t{}".format(tP, fP, fN, precicion, recall, row['name']))
+                    tPs.append(tP)
+                    fPs.append(fP)
+                    fNs.append(fN)
+                    precicions.append(precicion)
+                    recalls.append(recall)
+            test_log.append((tPs,fPs,fNs,precicions,recalls))
+            tPs = []
+            fPs = []
+            fNs = []
+            precicions = []
+            recalls = []
+        return test_log
         
     def get_false_negative_mask(self,index):
         if index == 'random':
