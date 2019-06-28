@@ -65,7 +65,7 @@ class UNet():
         self.__compile_model
 
 
-    def create_pretrained_model(self,encoder_type='vgg19',batch_norm=True,coord_conv=True,input_shape=(512, 768, 3),num_classes=2):        
+    def create_pretrained_model(self,encoder_type='vgg19',batch_norm=False,coord_conv=False,input_shape=(512, 768, 3),num_classes=2):        
         self.encoder_type = encoder_type
         self.batch_norm = batch_norm
         concats_list = []
