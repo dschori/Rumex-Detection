@@ -75,6 +75,29 @@ ___
 
 # data_generator.py:
 
-Class to create Unet-model.
+Class to create a Data Generator to Train the Model.
 
 ## Usage:
+Example for a datagenerator:
+```python
+params = {'target_size': Config.SHAPE,
+          'batch_size': 4,
+          'input_channels': 3,
+          'shuffle': True,
+          'output':"both"}
+
+gen = DataGenerator(df=train80_df,hist_equal=True,augment_data=True,save_images=False,**params)
+train_gen = iter(gen)
+
+"""
+   :param Pandas Dataframe "df": Dataframe to load data from
+   :param tuple "target_size": Target Size of Images
+   :param int "batch_size": How many images per Batch to return
+   :param int "input_channels": Number of Input Channels of Image
+   :param bool "shuffle": Whether to shuffle the data after each epoch or not
+   :param str "output": Which mask to output ("leaf", "root", "both")
+   :param bool "hist_equal": Whether to Equalize Histogramms if Images or not
+   :param bool "augment_data": Whether to Augment during Training or not
+   :return Generator
+"""
+```
