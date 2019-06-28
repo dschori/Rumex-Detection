@@ -21,7 +21,54 @@ UNet.create_model(index)
 
    :param bool "batchnorm": Add Batch Normalization Layers in Encoder Blocks or not
    :param tuble of int "input_shape" 
-   :return: image
+"""
+```
+___
+```python
+
+UNet.create_pretrained_model(index)
+
+"""
+   Creates (Encoder) Pretrained Model
+
+   :param str "encoder_type": Which Encoder Type ("vgg19", or "resnet101")
+   :param bool "batch_norm": Add Batch Normalization Layers in Encoder Blocks or not
+   :param tuble of int "input_shape" 
+"""
+```
+___
+```python
+
+UNet.freeze_encoder(index)
+
+"""
+   Freezes Encoder of Model
+
+   :param str "encoder_type": Which Encoder Type ("vgg19", or "resnet101")
+   :param Keras Model "model": Model to freeze the Encoder
+"""
+```
+___
+```python
+
+UNet.unfreeze_encoder(index)
+
+"""
+   Unfreezes Encoder of Model
+
+   :param str "encoder_type": Which Encoder Type ("vgg19", or "resnet101")
+   :param Keras Model "model": Model to unfreeze the Encoder
+"""
+```
+___
+```python
+
+UNet.get_model(index)
+
+"""
+   Returns the Model
+
+   :return Keras Model "model": Compiled Keras Model
 """
 ```
 ___
