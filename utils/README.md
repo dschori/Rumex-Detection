@@ -118,13 +118,13 @@ ___
 #### Init:
 Example:
 ```python
-vis_params = {'df':val20_df,
+ev_params = {'df':val20_df,
               'input_shape':(512,768,3),
               'masktype':'leaf',
               'predictiontype':'root',
               'model':model}
 
-vis = Evaluate(**vis_params)
+ev = Evaluate(**ev_params)
 
 """
    Evaluate constructor
