@@ -72,3 +72,9 @@ UNet.get_model(index)
 """
 ```
 ___
+
+# data_generator.py:
+
+Class to create Unet-model.
+
+## Usage:
