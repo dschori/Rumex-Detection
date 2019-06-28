@@ -2,11 +2,11 @@
 
 ![alt text](assets/segmentation.png)
 
-Prediction: Yellow Mask, Ground Truth: Cyan Border
+Leaf Prediction: Yellow Mask, Ground Truth: Cyan Border
 
 ![alt text](assets/roots.png)
 
-Prediction: Black Point, Ground Truth: Yellow Point
+Root Prediction: Black Point, Ground Truth: Yellow Point
 
 #### Required Packages:
 - tensorflow
