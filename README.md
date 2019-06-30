@@ -46,8 +46,8 @@ Example for usage:
 
 ```python
 # Note: 
-- Model0 must be taken as the Model
-- Input image must be a 3Channel RGB image with Ratio ~3:2
+# - Model0 must be taken as the Model
+# - Input image must be a 3Channel RGB image with Ratio ~3:2
 rd = Rumex_Detection(model_path="Path to Model0")
 
 # To get the leaf segmentation (as binary image) of an image:
