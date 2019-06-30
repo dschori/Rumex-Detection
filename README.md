@@ -48,12 +48,15 @@ Example for usage:
 # Note: 
 # - Model0 must be taken as the Model
 # - Input image must be a 3Channel RGB image with Ratio ~3:2
+
 rd = Rumex_Detection(model_path="Path to Model0")
 
 # To get the leaf segmentation (as binary image) of an image:
-img = rd.get_leaf_mask(image)
+
+binary_mask = rd.get_leaf_mask(image)
 
 # To get the root coordinates (as list of tuples (X,Y)) of an image:
+
 root_coordinates = rd.get_root_coords(image)
 
 ```
