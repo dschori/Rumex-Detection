@@ -32,7 +32,7 @@ class Rumex_Detection():
         def __calc_coords_v1(self, threshold):
                 labels = skimage.measure.label(self.pred[:,:,1]>threshold)
                 root_coords = skimage.measure.regionprops(labels)
-                root_coords = [r for r in root_coords if r.area > 1500]
+                root_coords = [r for r in root_coords if r.area > 500]
                 root_coords = [r.centroid for r in root_coords]
                 root_coords = [list(p) for p in root_coords] #Convert to same format
                 root_coords = [p[::-1] for p in root_coords] #Flipp X,Y
@@ -44,7 +44,7 @@ class Rumex_Detection():
                 self.__predict()
                 return self.pred[:,:,0].reshape(MODEL_INPUT_SHAPE) > threshold
         
-        def get_root_coords(self, image, threshold=0.8):
+        def get_root_coords(self, image, threshold=0.5):
                 self.img = image
                 self.__normalize()
                 self.__predict()
