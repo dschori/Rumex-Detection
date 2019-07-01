@@ -462,7 +462,6 @@ class Evaluate(Visualize):
 
     def get_root_pred_coord_v1(self,prediction,threshold=0.4):
         assert self.predictiontype == "root", "Wrong Predictiontype"
-        assert self.masktype == "root", "Wrong Masktype"
         prediction = prediction > threshold
         labels = skimage.measure.label(prediction)
         roots_pred = skimage.measure.regionprops(labels)
@@ -474,7 +473,6 @@ class Evaluate(Visualize):
 
     def get_root_pred_coord_v2(self,prediction):
         assert self.predictiontype == "root", "Wrong Predictiontype"
-        assert self.masktype == "root", "Wrong Masktype"
         # https://www.pyimagesearch.com/2015/11/02/watershed-opencv/
         pred = (prediction*255).astype("uint8")
         tmp = np.zeros((512,768,3),dtype="uint8")
@@ -534,7 +532,6 @@ class Evaluate(Visualize):
         
     def get_root_precicion(self,index,tolerance=30,print_distance_matrix=False):
         assert self.predictiontype == "root", "Wrong Predictiontype"
-        assert self.masktype == "root", "Wrong Masktype"
         self.selected_row = self.df[self.df['name'].str.contains(str(index))]
         self.load_data()
         self.predict()
