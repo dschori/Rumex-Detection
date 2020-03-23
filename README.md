@@ -13,18 +13,7 @@ Leaf Prediction: Yellow Mask, Ground Truth: Cyan Border
 Root Prediction: Black Point, Ground Truth: Yellow Point
 
 #### Required Packages:
-- tensorflow
-- keras
-- pandas
-- numpy
-- imgaug
-- seaborn
-- skimage
-- pil
-- sklearn
-- matplotlib
-- cv2
-- imutils
+See [Requirements](requirements.txt)
 
 # Documentation:
  * [Paper](docs/SchoriDamianHSR-Paper.pdf) published at: https://ieeexplore.ieee.org/document/8918914
