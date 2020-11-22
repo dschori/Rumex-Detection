@@ -6,11 +6,11 @@ Image segmentation of specific plants is an important task in precision farming.
 
 ![alt text](assets/segmentation.png)
 
-Leaf Prediction: Yellow Mask, Ground Truth: Cyan Border
+**Leaf Prediction:** Yellow Mask, **Ground Truth:** Cyan Border
 
 ![alt text](assets/roots.png)
 
-Root Prediction: Black Point, Ground Truth: Yellow Point
+**Root Prediction:** Black Point, **Ground Truth:** Yellow Point
 
 #### Required Packages:
 See [Requirements](requirements.txt)
